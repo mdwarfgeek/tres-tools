@@ -1,0 +1,340 @@
+#!/usr/bin/env python
+
+import argparse
+import math
+import os
+import re
+import sys
+
+import numpy
+
+import lfa
+
+# Stop pyplot trying to use X.
+import matplotlib
+matplotlib.use('Agg')
+
+import fftrv
+
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
+
+from scipy.interpolate import InterpolatedUnivariateSpline
+
+from medsig import *
+from poly import *
+from quad2d import *
+
+from makesky import *
+from prepord import *
+from read_spec import *
+
+# Constants used by the script go here.
+
+# Figure size based on pgplot.
+figsize = (10.5, 7.8)  # inches
+
+# Velocity range to plot
+velrange = 200  # km/s, plots +/- this much
+
+# Limb darkening coefficients for rotational broadening kernel.
+ald = 0.3729
+bld = 0.4561
+
+def todplot(h, velsa, velsb, xbest, ybest):
+  plt.imshow(h.T,
+             interpolation='none',
+             extent=[velsa[0], velsa[-1],
+                     velsb[-1], velsb[0]])
+  plt.xlim(velsa[0], velsa[-1])
+  plt.ylim(velsb[0], velsb[-1])
+  plt.axvline(xbest, color='white')
+  plt.axhline(ybest, color='white')
+  plt.xlabel("Primary velocity (km/s)")
+  plt.ylabel("Secondary velocity (km/s)")
+  plt.show()
+
+def todreg(dd, iabest, ibbest, velsa, velsb, c_targ_tmpla, c_targ_tmplb, spl, alp):
+  nvelsa = len(velsa)
+
+  ial = iabest - dd
+  if ial < 0:
+    ial = 0
+
+  iah = iabest + dd
+  if iah >= nvelsa:
+    iah = nvelsa-1
+
+  nvelsb = len(velsb)
+
+  ibl = ibbest - dd
+  if ibl < 0:
+    ibl = 0
+
+  ibh = ibbest + dd
+  if ibh >= nvelsb:
+    ibh = nvelsb-1
+
+  ialist = numpy.arange(ial, iah+1, 1)
+  iblist = numpy.arange(ibl, ibh+1, 1)
+
+  xx = numpy.empty([ len(ialist), len(iblist) ], dtype=numpy.double)
+  yy = numpy.empty_like(xx)
+  zz = numpy.empty_like(xx)
+
+  valist = velsa[ialist]
+
+  for ibd, ib in enumerate(iblist):
+    vb = velsb[ib]
+
+    dv = vb - valist
+
+    c_tmplb_tmpla = spl(dv)
+
+    denom = numpy.sqrt(1.0 + 2*alp*c_tmplb_tmpla + alp*alp)
+    h = (c_targ_tmpla[ialist] + alp * c_targ_tmplb[ib]) / denom
+
+    xx[:,ibd] = valist
+    yy[:,ibd] = vb
+    zz[:,ibd] = h
+
+  return xx, yy, zz
+
+def todcor(pdf, tmplaname, tmplbname, filename,
+           tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
+           tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
+           mbjd, wave, flux, e_flux, msk, vbcv,
+           vsinia, vsinib, lrat, order):
+
+  # Extract order and clean.
+  thistmpla_wave, thistmpla_flux, thistmpla_e_flux = prepord(order, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk)
+  thistmplb_wave, thistmplb_flux, thistmplb_e_flux = prepord(order, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk)
+  thiswave, thisflux, thise_flux = prepord(order, wave, flux, e_flux, msk)
+
+  # Take off sky.
+  ss = makesky(thistmpla_wave, thistmpla_flux, 4)
+
+  thistmpla_flux -= ss
+
+  ss = makesky(thistmplb_wave, thistmplb_flux, 4)
+
+  thistmplb_flux -= ss
+
+  thisrawflux = numpy.copy(thisflux)
+
+  ss = makesky(thiswave, thisflux, 4)
+
+  thisflux -= ss
+
+  # Number of measurements (pixels).
+  npix = len(thisflux)
+
+  # Set up FFT sampling.  Double-lined solutions seem to benefit
+  # from a bit less agressive filtering, so reduce that.
+  nbin = 32*npix
+  filtl = int(npix/3)    # taper start 3 pix
+  filth = int(npix/1.5)  # taper end 1.5 pix
+
+  frv = fftrv.fftrv(nbin=nbin,
+                    top_nrun=filtl,
+                    nrun=filth)
+
+  # Template x template.
+  zt, corrt, zbestt, hbestt, sigtb = frv.correlate(thistmplb_wave, thistmplb_flux,
+                                                   thistmpla_wave, thistmpla_flux,
+                                                   vsinib*1000/lfa.LIGHT,
+                                                   ald, bld,
+                                                   zbroadt=vsinia*1000/lfa.LIGHT)
+  
+  # Template x target.
+  za, corra, zbesta, hbesta, sigta = frv.correlate(thistmpla_wave, thistmpla_flux,
+                                                   thiswave, thisflux,
+                                                   vsinia*1000/lfa.LIGHT,
+                                                   ald, bld)
+  
+  zb, corrb, zbestb, hbestb, sigtb = frv.correlate(thistmplb_wave, thistmplb_flux,
+                                                   thiswave, thisflux,
+                                                   vsinib*1000/lfa.LIGHT,
+                                                   ald, bld)
+  
+  alp = lrat * sigtb/sigta
+      
+#  print >>sys.stderr, 'alp =', alp
+  
+  velst = zt * lfa.LIGHT / 1000
+  velsa = za * lfa.LIGHT / 1000
+  velsb = zb * lfa.LIGHT / 1000
+  
+  maxvel = 250
+  
+  ww = numpy.abs(velst) < 2*maxvel
+  
+  spl = InterpolatedUnivariateSpline(velst[ww], corrt[ww], k=1)
+  
+  ww = numpy.abs(velsa) < maxvel
+  
+  velsa = velsa[ww]
+  nvelsa = len(velsa)
+  
+  c_targ_tmpla = corra[ww]
+  
+  ww = numpy.abs(velsb) < maxvel
+  
+  velsb = velsb[ww]
+  nvelsb = len(velsb)
+  
+  c_targ_tmplb = corrb[ww]
+  
+  # First, search for the global maximum.  Compute TODCOR statistic one
+  # "vb" at a time, to avoid having to store the entire thing.
+  iabest = None
+  ibbest = None
+  hbest = None
+
+  for ib, vb in enumerate(velsb):
+    dv = vb - velsa
+    c_tmplb_tmpla = spl(dv)
+    
+    denom = numpy.sqrt(1.0 + 2*alp*c_tmplb_tmpla + alp*alp)
+    h = (c_targ_tmpla + alp * c_targ_tmplb[ib]) / denom
+
+    imax = h.argmax()
+    hmax = h[imax]
+
+    if hbest is None or hmax > hbest:
+      iabest = imax
+      ibbest = ib
+      hbest = hmax
+
+  # Fit quadratic to region around peak.
+  xx, yy, zz = todreg(1, iabest, ibbest, velsa, velsb, c_targ_tmpla, c_targ_tmplb, spl, alp)
+
+  xbest, ybest, zbest = quad2d(xx, yy, zz)
+
+  if pdf is not None:
+    fig = plt.figure(figsize=figsize)
+    
+    xx, yy, zz = todreg(250, iabest, ibbest, velsa, velsb, c_targ_tmpla, c_targ_tmplb, spl, alp)
+    todplot(zz,
+            velsa[iabest-250:iabest+250],
+            velsb[ibbest-250:ibbest+250],
+            xbest, ybest)
+    
+    pdf.savefig(fig)
+    plt.close()
+
+  return xbest, ybest, hbest
+
+def do_todcor(filelist, lrat, vsinia, vsinib, dopdf=False):
+  ssqh = 0
+
+  for ifile, filename in enumerate(filelist):
+    mbjd, wave, flux, e_flux, msk, blaze, vbcv, dumvrad = rs.read_spec(filename)
+    
+    if dopdf:
+      basefile = stripname(filename)
+      outfile = basefile + "_todcor.pdf"
+      
+      pdf = PdfPages(outfile)
+    else:
+      pdf = None
+
+    # Velocities.
+    xbest, ybest, hbest = todcor(pdf, tmplaname, tmplbname, filename,
+                                 tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
+                                 tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
+                                 mbjd, wave, flux, e_flux, msk, vbcv,
+                                 vsinia, vsinib, lrat,
+                                 order=rs.singleorder)
+    
+    if pdf is not None:
+      pdf.close()
+    
+    print "{0:14.6f} {1:8.3f} {2:8.3f} {3:8.6f}".format(lfa.ZMJD+mbjd, xbest, ybest, hbest)
+
+    ssqh += hbest*hbest
+
+  return ssqh
+
+ap = argparse.ArgumentParser()
+ap.add_argument("lrat")
+ap.add_argument("vsinia")
+ap.add_argument("vsinib")
+ap.add_argument("tmpla")
+ap.add_argument("tmplb")
+ap.add_argument("filelist", metavar="file", nargs="+")
+ap.add_argument("-o", type=int)
+ap.add_argument("-p", action="store_true")
+args = ap.parse_args()
+
+# New read_spec structure.
+rs = read_spec()
+
+if args.o is not None:
+  rs.overrideorder = args.o
+
+# Read templates.
+tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_blaze, tmpla_vbcv, tmpla_vrad = rs.read_spec(args.tmpla, istmpl=1)
+tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_blaze, tmplb_vbcv, tmplb_vrad = rs.read_spec(args.tmplb, istmpl=1)
+
+vsinia = float(args.vsinia)
+vsinib = float(args.vsinib)
+tmplaname = os.path.basename(args.tmpla)
+tmplbname = os.path.basename(args.tmplb)
+
+filelist = args.filelist
+nf = len(args.filelist)
+
+m = re.match(r'^([^\-]+)\-([^\-]+)$', args.lrat)
+if m:
+  lrat1 = float(m.group(1))
+  lrat2 = float(m.group(2))
+
+  l_lrat = numpy.linspace(lrat1, lrat2, num=11, endpoint=True)
+  l_ssqh = numpy.empty_like(l_lrat)
+  
+  for ilrat, thislrat in enumerate(l_lrat):
+    print "L2/L1 =", thislrat
+    ssqh = do_todcor(filelist, l_lrat[ilrat], vsinia, vsinib)
+    l_ssqh[ilrat] = ssqh
+
+  coef = numpy.polynomial.polynomial.polyfit(l_lrat, l_ssqh, 2)
+
+  best_lrat = -0.5*coef[1]/coef[2]
+  
+  print >>sys.stderr, "Best L2/L1 =", best_lrat
+  
+  plt.plot(l_lrat, l_ssqh, '.')
+  
+  xl = l_lrat[0]-0.05*(l_lrat[-1]-l_lrat[0])
+  xh = l_lrat[-1]+0.05*(l_lrat[-1]-l_lrat[0])
+  
+  mod_x = numpy.linspace(xl, xh, 1001)
+  mod_y = numpy.polynomial.polynomial.polyval(mod_x, coef)
+
+  basefile = re.sub(r'_.*$', "", stripname(filelist[0]))
+  outfile = basefile + "_todcor_lrat.pdf"
+
+  print "Writing plot to", outfile
+
+  pdf = PdfPages(outfile)
+  fig = plt.figure(figsize=figsize)
+
+  plt.plot(mod_x, mod_y)
+  plt.xlim(xl, xh)
+  
+  plt.axvline(best_lrat)
+  
+  plt.xlabel("L2/L1")
+  plt.ylabel("Sum(h^2)")
+
+  pdf.savefig(fig)
+  plt.close()
+
+  pdf.close()
+else:
+  lrat = float(args.lrat)
+  ssqh = do_todcor(filelist, lrat, vsinia, vsinib, args.p)
+
+sys.exit(0)
+

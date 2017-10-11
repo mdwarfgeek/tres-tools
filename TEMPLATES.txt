@@ -1,0 +1,14 @@
+These are the templates I normally use:
+
+Gl 809   M0
+Gl 699   M4
+
+Others that may be useful:
+
+Gl 411   M2
+Gl 436   M3
+Gl 83.1  M4.5, active (but still slowly rotating)
+Gl 406   M6  if something late is needed (but usually Gl 699 works fine and
+             has higher s/n)
+
+For consistent velocities, use Nidever et al. 2002 to set VELOCITY= keyword.
