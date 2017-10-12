@@ -613,6 +613,12 @@ def do_ews(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze,
 
   restwave = wave / (1.0 + vrad * 1000 / lfa.LIGHT)
 
+  if tmpl_blaze is None:
+    tmpl_blaze = numpy.ones_like(flux)
+
+  if blaze is None:
+    blaze = numpy.ones_like(flux)
+
   # The Halpha continuum regions come from Suarez Mascareno et al. (2015)
   # which appear to originate in Kurster et al. (2003) except the short
   # wavelength edge of the short wavelength side continuum band seems to
