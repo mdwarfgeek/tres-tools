@@ -24,6 +24,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from medsig import *
 from poly import *
 
+from lsd import *
 from makesky import *
 from prepord import *
 from read_spec import *
@@ -35,6 +36,10 @@ figsize = (10.5, 7.8)  # inches
 
 # Velocity range to plot
 velrange = 150  # km/s, plots +/- this much
+
+# Regularization constant for LSDs.  Depends on template and possibly
+# also on SNR, so may need changing.
+kreg = 100
 
 def do_vrad(pdf, tmplname, filename,
             tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
@@ -131,6 +136,44 @@ def do_vrad(pdf, tmplname, filename,
   plt.close()
 
   return vbest, hbest
+
+def do_lsd(pdf, filename,
+           tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
+           mbjd, wave, flux, e_flux, msk,
+           vrad, orders, savefile=False):
+  # Compute at 0.5 km/s intervals.
+  vl = vrad-velrange
+  vh = vrad+velrange
+  nv =  801
+
+  vels, prof = lsd_multiorder(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
+                              wave, flux, e_flux, msk,
+                              orders,
+                              vl, vh, nv,
+                              kreg)
+
+  # Optionally save LSD to file.
+  if savefile:
+    basefile = stripname(filename)
+    lsdfile = basefile + "_diff_lsd.txt"
+
+    with open(lsdfile, "w") as lfp:
+      for imeas, thisvel in enumerate(vels):
+        print >>lfp, thisvel, prof[imeas]
+
+  # Plot.
+  fig = plt.figure(figsize=figsize)
+
+  plt.plot(vels, prof)
+
+  plt.xlim(vels[0], vels[-1])
+
+  plt.xlabel("Velocity (km/s)".format(vrad))
+  plt.ylabel("Normalized flux")
+  plt.title("{0:s} differential LSD".format(filename))
+
+  pdf.savefig(fig)
+  plt.close()
 
 def do_multi_vrad(pdf, tmplname, filename,
                   tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
@@ -240,6 +283,12 @@ for ifile, filename in enumerate(filelist):
                         tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
                         mbjd, wave, flux, e_flux, msk,
                         order=rs.singleorder)
+
+  do_lsd(pdf, filename,
+         tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
+         mbjd, wave, flux, e_flux, msk,
+         vrad,
+         orders=rs.multiorder)
 
   mean_vrad, e_mean_vrad = do_multi_vrad(pdf, tmplname, targname,
                                          tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
