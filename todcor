@@ -137,7 +137,8 @@ def todcor(pdf, tmplaname, tmplbname, filename,
 
   frv = fftrv.fftrv(nbin=nbin,
                     top_nrun=filtl,
-                    nrun=filth)
+                    nrun=filth,
+                    pkfit=0)
 
   # Template x template.
   zt, corrt, zbestt, hbestt, sigtb = frv.correlate(thistmplb_wave, thistmplb_flux,
@@ -320,10 +321,11 @@ if m:
   pdf = PdfPages(outfile)
   fig = plt.figure(figsize=figsize)
 
-  plt.plot(mod_x, mod_y)
+  plt.plot(mod_x, mod_y, color="blue")
+  plt.plot(l_lrat, l_ssqh, 'o', color="black")
   plt.xlim(xl, xh)
   
-  plt.axvline(best_lrat)
+  plt.axvline(best_lrat, color="black")
   
   plt.xlabel("L2/L1")
   plt.ylabel("Sum(h^2)")
