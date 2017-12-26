@@ -73,6 +73,8 @@ class read_spec:
         specname = "mike"
       elif val == "IGRINS":
         specname = "igrins"
+      elif val == "ELODIE":
+        specname = "elodie"
 
     if specname is None:
       print >>sys.stderr, "Unrecognised instrument"
