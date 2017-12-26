@@ -43,6 +43,8 @@ velrange = 200  # km/s, plots +/- this much
 kreg = 100
 
 # Limb darkening coefficients for rotational broadening kernel.
+# These are from Phoenix mod. atm. for Teff=3224K, logg=5, Rc band,
+# from Claret (2000) 2000A+A...363.1081C
 ald = 0.3729
 bld = 0.4561
 
@@ -85,7 +87,7 @@ def do_vrad(pdf, tmplname, filename,
       z, corr, zbest, hbest, sigt = frv.correlate(thistmpl_wave, thistmpl_flux,
                                                   thiswave, thisflux,
                                                   vsini*1000 / lfa.LIGHT,
-                                                  0.3729, 0.4561)
+                                                  ald, bld)
       
       # Normalised (-chisq) like quantity.
       p = hbest*hbest
@@ -116,7 +118,7 @@ def do_vrad(pdf, tmplname, filename,
   z, corr, zbest, hbest, sigt = frv.correlate(thistmpl_wave, thistmpl_flux,
                                               thiswave, thisflux,
                                               usevsini*1000 / lfa.LIGHT,
-                                              0.3729, 0.4561)
+                                              ald, bld)
 
   vels = z * lfa.LIGHT / 1000
   vbest = zbest * lfa.LIGHT / 1000
