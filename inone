@@ -645,9 +645,9 @@ for ifile, filename in enumerate(filelist):
   pdf.close()
 
   if ewha is not None:
-    print "{0:s} {1:.6f} {2:.4f} {3:.4f} {4:.2f} {5:.4f} {6:.4f} {7:.4f} {8:.4f}".format(filename, lfa.ZMJD+mbjd, vrad, hbest, vsinibest, ewha, e_ewha, ewcai, e_ewcai)
+    print "{0:s} {1:.4f} {2:.3f} {3:.3f} {4:.2f} {5:.4f} {6:.4f} {7:.4f} {8:.4f}".format(filename, lfa.ZMJD+mbjd, vrad, hbest, vsinibest, ewha, e_ewha, ewcai, e_ewcai)
   else:
-    print "{0:s} {1:.6f} {2:.4f} {3:.4f} {4:.2f}".format(filename, lfa.ZMJD+mbjd, vrad, hbest, vsinibest)
+    print "{0:s} {1:.4f} {2:.3f} {3:.3f} {4:.2f}".format(filename, lfa.ZMJD+mbjd, vrad, hbest, vsinibest)
 
 sys.exit(0)
 

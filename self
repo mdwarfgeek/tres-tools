@@ -297,7 +297,7 @@ for ifile, filename in enumerate(filelist):
 
   pdf.close()
 
-  print "{0:s} {1:.6f} {2:.6f} {3:.6f}".format(filename, lfa.ZMJD+mbjd, mean_vrad, e_mean_vrad, hbest)
+  print "{0:s} {1:.4f} {2:.3f} {3:.3f}".format(filename, lfa.ZMJD+mbjd, mean_vrad, e_mean_vrad, hbest)
 
 sys.exit(0)
 

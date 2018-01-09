@@ -253,7 +253,7 @@ def do_todcor(filelist, lrat, vsinia, vsinib, dopdf=False):
     if pdf is not None:
       pdf.close()
     
-    print "{0:14.6f} {1:8.3f} {2:8.3f} {3:8.6f}".format(lfa.ZMJD+mbjd, xbest, ybest, hbest)
+    print "{0:12.4f} {1:8.3f} {2:8.3f} {3:6.3f}".format(lfa.ZMJD+mbjd, xbest, ybest, hbest)
 
     ssqh += hbest*hbest
 
