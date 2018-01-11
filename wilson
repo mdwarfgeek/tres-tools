@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+
+import sys
+import re
+import math
+import numpy
+import fitsio
+import matplotlib.pyplot as plt
+
+vels = numpy.genfromtxt(sys.argv[1],
+                        dtype={"names": ("bjd", "v1", "v2", "r"),
+                               "formats": ("f8", "f8", "f8", "f8") })
+
+v1 = vels["v1"]
+v2 = vels["v2"]
+
+coef = numpy.polynomial.polynomial.polyfit(v2, v1, 1, full=False)
+
+q = -coef[1]
+gamma = coef[0] / (1+q)
+
+print "q =", q
+print "gamma =", gamma
+
+# TODO: uncertainties
+
+plt.subplot(2, 1, 1)
+
+plt.plot(v2, v1, '.')
+xl, xh = plt.xlim()
+plt.plot([xl, xh], numpy.polynomial.polynomial.polyval([xl, xh], coef))
+
+plt.ylabel("v1 (km/s)")
+
+plt.subplot(2, 1, 2)
+
+resid = v1 - numpy.polynomial.polynomial.polyval(v2, coef)
+
+plt.plot(v2, resid, '.')
+plt.axhline(0)
+
+plt.xlabel("v2 (km/s)")
+plt.ylabel("Residual (km/s)")
+
+plt.tight_layout()
+plt.show()

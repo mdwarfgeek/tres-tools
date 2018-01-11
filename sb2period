@@ -1,0 +1,185 @@
+#!/usr/bin/env python
+
+import sys
+import math
+import numpy
+import sfit
+import matplotlib.pyplot as plt
+
+argc = len(sys.argv)
+
+if argc < 3:
+  print "Usage:\t", sys.argv[0], "dvelfile [...] pmin pmax"
+  sys.exit(1)
+
+(pmin, pmax) = map(float, sys.argv[argc-2:argc])
+filelist = sys.argv[1:argc-2]
+
+buf = [None]*len(filelist)
+
+window=0
+
+bjdbase = None
+
+for ilc, lcfile in enumerate(filelist):
+  # Read data.
+  vels = numpy.genfromtxt(sys.argv[1],
+                          dtype={"names": ("bjd", "v1", "v2", "h"),
+                                 "formats": ("f8", "f8", "f8", "f8") },
+                          loose=False)
+
+  # Make sure sorted on time.
+  numpy.sort(vels, order="bjd")
+
+  # This is Ktot * vrad function, gamma cancels out.
+  y = vels["v1"] - vels["v2"]
+  wt = vels["h"]**2
+
+  # Take off first timestamp.
+  if bjdbase is None:
+    bjdbase = vels[0]["bjd"]
+
+  t = vels["bjd"] - bjdbase
+
+  # Keep track of largest window for deciding frequency sampling.
+  if t[-1] > window:
+    window = t[-1]
+
+  # Add a tuple to the buffer.
+  buf[ilc] = (t, y, wt,
+              None,   # external parameters
+              None,   # DCs
+              None)   # Sinusoids
+
+# Sampling in frequency (with oversampling).
+vsamp = 0.1 / window
+
+# Period range.
+pl = int(math.floor(1.0 / (vsamp*pmax)))
+if pl < 1:
+  pl = 1
+
+ph = int(math.ceil(1.0 / (vsamp*pmin)))
+
+nn = ph-pl+1
+
+# Perform period search.
+(pergrm, winfunc) = sfit.search(buf, pl, ph, vsamp)
+
+# "Amplitude spectrum" equivalent is square root of chi^2.
+ampspec = numpy.sqrt(pergrm)
+
+# Best period.
+p = numpy.argmin(ampspec)
+
+# Parabolic interpolation for a better estimate.
+if p > 0 and p < nn-1:
+    aa = ampspec[p]
+    bb = 0.5*(ampspec[p+1] - ampspec[p-1])
+    cc = 0.5*(ampspec[p+1] + ampspec[p-1] - 2.0*aa)
+    offset = -0.5*bb/cc
+else:
+    offset = 0.0
+
+vbest = (pl+p+offset)*vsamp
+
+print "Best period", 1.0/vbest, "days"
+
+(chinull, bnull, bcovnull) = sfit.null(buf)
+#print "Null hypothesis", chinull, bnull, bcovnull
+
+(chialt, balt, bcovalt) = sfit.single(buf, vbest)
+#print "Alternate hypothesis", chialt, balt, bcovalt
+
+# Frequency grid for plot.
+v = numpy.linspace(pl, ph, nn)
+v *= vsamp
+
+# Plots.
+npanel = 2*len(buf)+2
+
+for ilc, lc in enumerate(buf):
+    (t, y, wt, ep, idc, iamp) = lc
+
+    b = balt[ilc]
+
+    if ep is not None:
+      nep = ep.shape[0]
+    else:
+      nep = 0
+
+    if idc is not None:
+      ndc = numpy.max(idc)+1
+    else:
+      ndc = 0
+
+    if iamp is not None:
+      namp = numpy.max(iamp)+1
+    else:
+      namp = 1
+
+    # This is how the "b" array is packed.
+    bdc = b[0:ndc]        # DCs
+    bep = b[ndc:ndc+nep]  # external parameters
+    bsc = b[ndc+nep:]     # sin, cos, sin, cos, ...
+
+    # "Corrected" y array
+    ycorr = y
+
+    plt.subplot(npanel, 1, 2*ilc+1)
+#    plt.axis([t[0], t[-1], numpy.max(ycorr), numpy.min(ycorr)])
+
+    plt.plot(t, ycorr, ".", color="black")
+
+    modx = numpy.linspace(t[0], t[-1], 1000)
+    modp = 2*math.pi*vbest*modx
+
+    mody = bsc[0] * numpy.sin(modp) + bsc[1] * numpy.cos(modp)
+
+    # Conjunction phase and time = downward-going zero-crossing.
+    phic = math.atan2(bsc[1], -bsc[0]) / (2.0*math.pi)
+    print "T_0 =", bjdbase + phic / vbest
+
+    plt.plot(modx, mody, color="red")
+
+    plt.ylabel("$\\Delta$v (km/s)")
+    plt.xlabel("Time from start (days)")
+
+    plt.subplot(npanel, 1, 2*ilc+2)
+#    plt.axis([0.0, 1.0, numpy.max(ycorr), numpy.min(ycorr)])
+
+    phase = numpy.fmod(vbest*t, 1.0)
+
+    plt.plot(phase, ycorr, ".", color="black")
+    
+    modx = numpy.linspace(0.0, 1.0, 1000)
+    modp = 2*math.pi*modx
+
+    mody = bsc[0] * numpy.sin(modp) + bsc[1] * numpy.cos(modp)
+
+    print "K1+K2 =", math.sqrt(bsc[0]**2 + bsc[1]**2), "km/s"
+
+    plt.plot(modx, mody, color="red")
+
+    plt.ylabel("$\\Delta$v (km/s)")
+    plt.xlabel("Phase")
+
+axp = plt.subplot(npanel, 1, npanel-1)
+axp.axis([numpy.min(v), numpy.max(v), numpy.max(ampspec), numpy.min(ampspec)])
+axp.plot(v, ampspec, color="black")
+axp.plot([vbest, vbest], plt.ylim(), color="red", linestyle='--')
+
+plt.ylabel("sqrt($\chi^2$)")
+
+plt.subplot(npanel, 1, npanel, sharex=axp)
+plt.axis([numpy.min(v), numpy.max(v), 0.0, 1.0])
+plt.plot(v, winfunc, color="black")
+plt.plot([vbest, vbest], plt.ylim(), color="red", linestyle='--')
+
+plt.xlabel("Frequency (days$^{-1}$)")
+plt.ylabel("Window function")
+
+plt.tight_layout()
+plt.show()
+
+sys.exit(0)

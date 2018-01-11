@@ -1,0 +1,561 @@
+#!/usr/bin/env python
+
+import argparse
+import math
+import sys
+
+import numpy
+import emcee
+
+import eb
+
+import matplotlib
+
+from nlfit import *
+
+# Deal with command-line arguments.
+ap = argparse.ArgumentParser()
+ap.add_argument("pset", help="parameter file")
+ap.add_argument("vels", help="velocities")
+ap.add_argument("-3", action="store_true", dest="triple", help="read and plot third star from TRICOR file")
+ap.add_argument("-m", help="run MCMC storing output to file M")
+ap.add_argument("-n", type=int, help="set number of MCMC samples to N")
+ap.add_argument("-s", action="store_true", help="fit separate sigmas for each star")
+ap.add_argument("-u", action="store_true", help="plot unfolded phase")
+args = ap.parse_args()
+
+# Type 42 fonts needed for publication.
+matplotlib.rcParams["pdf.fonttype"] = 42
+matplotlib.rcParams["ps.fonttype"] = 42
+matplotlib.rcParams["font.size"] = 16
+
+# Make sure matplotlib doesn't try to use X11 if we're running
+# in non-interactive mode.
+if args.m is not None:
+  matplotlib.use('Agg')
+
+import matplotlib.pyplot as plt
+
+# Fixed random number seed to make results reproducible.
+numpy.random.seed(42)
+
+# Build main parameter vector and metadata vectors.
+parm = numpy.zeros(eb.NPAR+3+args.s, dtype=numpy.double)
+parm_names = list(eb.parnames)
+parm_units = list(eb.parunits)
+
+PAR_GAMMA = eb.NPAR
+parm_names.append("gamma")
+parm_units.append("km/s")
+
+PAR_KTOT = eb.NPAR+1
+parm_names.append("K1+K2")
+parm_units.append("km/s")
+
+PAR_S1 = eb.NPAR+2
+
+if args.s:
+  parm_names.append("sigma1")
+else:
+  parm_names.append("sigma")
+
+parm_units.append("km/s")
+
+if args.s:
+  PAR_S2 = eb.NPAR+3
+  parm_names.append("sigma2")
+  parm_units.append("km/s")
+else:
+  PAR_S2 = None
+
+parm_units[eb.PAR_T0] = "BJD"
+
+name2iparm = {}
+
+for iparm, name in enumerate(parm_names):
+  name2iparm[name] = iparm
+
+# Initialize a couple of parameters we don't use to sensible values
+# to avoid floating point exceptions in the model calculation.
+parm[eb.PAR_RASUM] =   0.001  # dummy value
+parm[eb.PAR_RR]    =   0.001  # dummy value
+
+# Supply a default for error scaling parameter(s).
+parm[PAR_S1]       =   0.15   # km/s
+
+if args.s:
+  parm[PAR_S2] = parm[PAR_S1]
+
+# Load data.
+if args.triple:
+  vels = numpy.genfromtxt(args.vels,
+                          dtype={"names": ("bjd", "v1", "v2", "v3", "h"),
+                                 "formats": ("f8", "f8", "f8", "f8", "f8") },
+                          loose=False)
+
+  v3 = vels["v3"]
+else:
+  vels = numpy.genfromtxt(args.vels,
+                          dtype={"names": ("bjd", "v1", "v2", "h"),
+                                 "formats": ("f8", "f8", "f8", "f8") },
+                          loose=False)
+
+  v3 = None
+
+tbase = math.floor(vels["bjd"][0])
+
+bjd = vels["bjd"] - tbase
+v1 = vels["v1"]
+v2 = vels["v2"]
+hh = vels["h"]
+
+nobs = len(bjd)
+
+# Bring in fit parameters.
+plist = []
+plist_names = []
+plist_units = []
+fixed = []
+
+with open(args.pset, "r") as fp:
+  for line in fp:
+    # Remove comments and trim white space.
+    ll = line.split("#", 2)
+    ls = ll[0].strip()
+
+    # Now split into fields.
+    ll = ls.split()
+    if len(ll) < 3:
+      print >>sys.stderr, "could not understand:", line
+      sys.exit(1)
+
+    name = ll[0]
+    value = float(ll[1])
+    vary = int(ll[2])
+
+    if len(ll) > 3:
+      sigma = float(ll[3])
+    else:
+      sigma = None
+
+    if name in name2iparm:
+      iparm = name2iparm[name]
+
+      # Set value.
+      if iparm == eb.PAR_T0:
+        parm[iparm] = value - tbase
+      else:
+        parm[iparm] = value
+
+      # Add to parameter list if we're varying.
+      if vary > 0:
+        plist.append(iparm)
+        plist_names.append(name)
+        plist_units.append(parm_units[iparm])
+
+        if vary == 1:  # 1=in LM and MC, 2=in MC only
+          fixed.append(False)
+        elif vary == 2:
+          fixed.append(True)
+        else:
+          print >>sys.stderr, "unknown vary value:", vary
+          sys.exit(1)
+
+    else:
+      print >>sys.stderr, "unknown parameter:", name
+      sys.exit(1)
+
+# Convert these to numpy arrays.
+plist = numpy.array(plist, dtype=numpy.int)
+fixed = numpy.array(fixed, dtype=numpy.bool)
+
+# Store this for later.
+errguess1 = parm[PAR_S1]
+
+if args.s:
+  errguess2 = parm[PAR_S2]
+else:
+  errguess2 = errguess1
+
+# Format arrays for fitting.
+bjdfit = numpy.empty([2*nobs], dtype=numpy.double)
+vfit = numpy.empty_like(bjdfit)
+e_vfit = numpy.empty_like(bjdfit)
+
+bjdfit[0:nobs] = bjd
+bjdfit[nobs:2*nobs] = bjd
+
+vfit[0:nobs] = v1
+vfit[nobs:2*nobs] = v2
+
+e_vfit[0:nobs] = errguess1 / hh
+e_vfit[nobs:2*nobs] = errguess2 / hh
+
+typ = numpy.empty_like(vfit, dtype=numpy.uint8)
+typ[0:nobs] = eb.OBS_VRAD1
+typ[nobs:2*nobs] = eb.OBS_VRAD2
+
+# L-M objective function.
+def fit_func (trial, ymod):
+  ourparm = numpy.copy(parm)
+  ourparm[plist] = trial
+
+  eb.model(ourparm, bjdfit, typ, 0, out=ymod)
+  ymod *= ourparm[PAR_KTOT] / (1.0 + ourparm[eb.PAR_Q])
+  ymod[0:nobs] *= ourparm[eb.PAR_Q]
+  ymod[nobs:2*nobs] *= -1
+  ymod += ourparm[PAR_GAMMA]
+
+# Function returning log of posterior probability for MCMC.
+def logpost (trial, x, y, yerr):
+  # Parameter vector.
+  ourparm = numpy.copy(parm)
+  ourparm[plist] = trial
+
+  # Check ranges.
+  ecc = math.hypot(ourparm[eb.PAR_ECOSW], ourparm[eb.PAR_ESINW])
+
+  if ourparm[PAR_S1] <= 0 or ecc >= 1.0:
+    return -numpy.inf
+
+  if args.s:
+    if ourparm[PAR_S2] <= 0:
+      return -numpy.inf
+
+  # Likelihood.
+  ymod = eb.model(ourparm, x, typ, 0)
+  ymod *= ourparm[PAR_KTOT] / (1.0 + ourparm[eb.PAR_Q])
+  ymod[0:nobs] *= ourparm[eb.PAR_Q]
+  ymod[nobs:2*nobs] *= -1
+  ymod += ourparm[PAR_GAMMA]
+  
+  wt = numpy.empty_like(ymod)
+  wt[0:nobs] = (hh / ourparm[PAR_S1])**2
+
+  if args.s:
+    wt[nobs:2*nobs] = (hh / ourparm[PAR_S2])**2
+  else:
+    wt[nobs:2*nobs] = (hh / ourparm[PAR_S1])**2
+
+  loglike = -0.5*(numpy.sum(wt*(y-ymod)**2 - numpy.log(wt)))
+
+  # Prior: Modified Jeffreys on error scale parameter.
+  logprior = numpy.log(ourparm[PAR_S1] + 0.1*errguess1)
+
+  if args.s:
+    logprior += numpy.log(ourparm[PAR_S2] + 0.1*errguess2)
+
+  # Convert to uniform prior in eccentricity.
+  ecc = numpy.hypot(ourparm[eb.PAR_ECOSW], ourparm[eb.PAR_ESINW])
+  if ecc > 0:
+    logprior += numpy.log(ecc)
+
+  return loglike - logprior
+
+ndim = len(plist)
+
+vfinal, verr, chisq, ndof = nlfit(fit_func, parm[plist], fixed, vfit, e_vfit)
+
+parm[plist] = vfinal
+
+# Fit parameters.
+print "L-M parameters:"
+
+for iparm in range(ndim):
+  value = vfinal[iparm]
+
+  if plist[iparm] == eb.PAR_T0:
+    value += tbase
+
+  print "{0:<16} {1:14.6f} +/- {2:8.6f} {3}".format(plist_names[iparm],
+                                                    value,
+                                                    verr[iparm],
+                                                    plist_units[iparm])
+
+print 'chi squared =', chisq, 'ndof =', ndof
+
+if args.m is not None:
+  # Init MC
+  nwalk = 100
+
+  samp = emcee.EnsembleSampler(nwalk, ndim, logpost, args=(bjdfit, vfit, e_vfit))
+
+  pert = 3*numpy.copy(verr)
+
+  for iparm in range(ndim):
+    jparm = plist[iparm]
+
+    if fixed[iparm]:
+      if jparm == PAR_GAMMA or jparm == PAR_KTOT:
+        pert[iparm] = 1.0
+      elif jparm == PAR_S1:
+        pert[iparm] = 0.1 * errguess1
+      elif args.s and jparm == PAR_S2:
+        pert[iparm] = 0.1 * errguess2
+      else:
+        pert[iparm] = 0.01
+
+  pos = [vfinal + pert * numpy.random.randn(ndim) for i in range(nwalk)]
+
+  if args.n is not None:
+    nsim = args.n
+  else:
+    nsim = 50000
+
+  nburn = nsim // 5
+  if nburn < 1000:
+    nburn = 1000
+
+  ntot = nsim + nburn
+
+  samp.run_mcmc(pos, ntot, rstate0=numpy.random.get_state())
+
+  for idim in range(ndim):
+    plt.subplot(ndim, 1, idim+1)
+
+    for iwalk in range(nwalk):
+      plt.plot(samp.chain[iwalk,:,idim])
+
+    plt.axvline(nburn)
+    plt.ylabel(plist_names[idim])
+
+  plt.savefig(args.m + "_chains.png")
+
+  print "Acceptance fraction:", samp.acceptance_fraction
+  print "Autocorrelation lengths:", samp.acor
+
+  ch = samp.chain[:,nburn:,:].reshape((-1, ndim))
+
+#  numpy.savetxt("mcmc.chain.gz", ch)
+  numpy.save(args.m, ch, allow_pickle=False)
+
+  lfp = open(args.m + "_orbit.txt", "w")
+
+  print >>lfp, "MC parameters:"
+  print "MC parameters:"
+
+  vmed = numpy.empty([ndim])
+  vad = numpy.empty([ndim])
+
+  for iparm in range(ndim):
+    vec = ch[:,iparm]
+
+    med = numpy.median(vec)
+    ad = numpy.absolute(vec-med)
+
+    err = numpy.percentile(ad, 68.3)
+
+    vmed[iparm] = med
+    vad[iparm] = err
+
+    if plist[iparm] == eb.PAR_T0:
+      med += tbase
+
+    line = "{0:<16} {1:14.6f} +/- {2:8.6f} {3}".format(plist_names[iparm],
+                                                       med,
+                                                       err,
+                                                       plist_units[iparm])
+
+    print >>lfp, line
+    print line
+
+  # Argument and phase of periastron need special treatment.
+  parm[plist] = vmed
+
+  theomega = math.degrees(math.atan2(parm[eb.PAR_ESINW], parm[eb.PAR_ECOSW]))
+  thephiperi = eb.phiperi(parm)
+
+  # Derived parameters.
+  nsamp = ch.shape[0]
+
+  dermap = [eb.PAR_E, eb.PAR_OMEGA, eb.PAR_A, eb.PAR_MTOT, eb.PAR_M1, eb.PAR_M2]
+
+  dernames = ["e", "omega", "a sin i", "(M_1+M_2) sin^3 i", "M_1 sin^3 i", "M_2 sin^3 i", "Tperi"]
+  derunits = [None] * len(dernames)
+
+  for ipar, jpar in enumerate(dermap):
+    derunits[ipar] = eb.derunits[jpar]
+
+  derunits[len(dermap)] = "BJD"
+
+  vder = numpy.empty([nsamp, len(dernames)])
+  mkvec = numpy.empty([nsamp])
+
+  for isamp in range(nsamp):
+    thissamp = ch[isamp]
+    parm[plist] = thissamp
+
+    thisvder = eb.getvder(parm, parm[PAR_GAMMA], parm[PAR_KTOT])
+
+    # Force correct revolution for omega by wrapping delta into (-pi,pi].
+    domega = thisvder[eb.PAR_OMEGA] - theomega
+    n = round(domega / 360.0)
+    thisvder[eb.PAR_OMEGA] = theomega + domega - n * 360.0
+
+    # Same for phiperi.
+    phiperi = eb.phiperi(parm)
+
+    dphi = phiperi - thephiperi
+    n = round(dphi)
+    phiperi = thephiperi + dphi - n
+
+    tperi = parm[eb.PAR_T0] + parm[eb.PAR_P] * phiperi
+
+    vder[isamp,0:len(dermap)] = thisvder[dermap]
+    vder[isamp,len(dermap)] = tperi
+
+  print >>lfp, "Derived parameters:"
+  print "Derived parameters:"
+
+  for ipar, name in enumerate(dernames):
+    unit = derunits[ipar]
+
+    vec = vder[:,ipar]
+
+    med = numpy.median(vec)
+    ad = numpy.absolute(vec-med)
+
+    err = numpy.percentile(ad, 68.3)
+
+    if name == "Tperi":
+      med += tbase
+
+    line = "{0:<18} {1:12.6f} +/- {2:8.6f} {3}".format(name, med, err, unit)
+
+    print >>lfp, line
+    print line
+
+  lfp.close()
+
+  # Update parameters.
+  parm[plist] = vmed
+  vfinal = vmed
+  verr = vad
+
+  ndof = vfit.size - vmed.size
+
+  if args.s:
+    print "Median rms(1) =", parm[PAR_S1]/numpy.median(hh), "km/s"
+    print "Median rms(2) =", parm[PAR_S2]/numpy.median(hh), "km/s"
+  else:
+    print "Median rms =", parm[PAR_S1]/numpy.median(hh), "km/s"
+
+# Phases of observations.
+tmp = (bjdfit - parm[eb.PAR_T0]) / parm[eb.PAR_P]
+tmporig = (bjd - parm[eb.PAR_T0]) / parm[eb.PAR_P]
+
+if args.u:
+  phi = tmp
+  phiorig = tmporig
+
+  phimin = numpy.min(phi)
+  phimax = numpy.max(phi)
+  
+  phimin -= 0.05*(phimax-phimin)
+  phimax += 0.05*(phimax-phimin)
+
+else:
+  phi = tmp - numpy.floor(tmp)
+  phiorig = tmporig - numpy.floor(tmporig)
+
+  phimin = 0.0
+  phimax = 1.0
+
+print "Last point phi =", phi[-1]
+
+# Plot.
+phiplot = numpy.linspace(phimin, phimax, 1000)
+typplot = numpy.empty_like(phiplot, dtype=numpy.uint8)
+
+e_vfit[0:nobs] = parm[PAR_S1] / hh
+
+if args.s:
+  e_vfit[nobs:2*nobs] = parm[PAR_S2] / hh
+else:
+  e_vfit[nobs:2*nobs] = parm[PAR_S1] / hh
+
+typplot.fill(eb.OBS_VRAD1)
+yplot1 = eb.model(parm, phiplot, typplot, eb.FLAG_PHI)
+yplot1 = parm[PAR_GAMMA] + yplot1 * parm[PAR_KTOT] * parm[eb.PAR_Q] / (1.0 + parm[eb.PAR_Q])
+
+typplot.fill(eb.OBS_VRAD2)
+yplot2 = eb.model(parm, phiplot, typplot, eb.FLAG_PHI)
+yplot2 = parm[PAR_GAMMA] - yplot2 * parm[PAR_KTOT] / (1.0 + parm[eb.PAR_Q])
+
+plt.subplot(2, 1, 1)
+
+plt.plot(phiplot, yplot1, color="blue")
+plt.plot(phiplot, yplot2, color="green")
+
+if args.triple:
+  mean3 = numpy.mean(v3)
+  resid3 = v3 - mean3
+
+  print "gamma3 =", mean3, "km/s"
+
+  if args.s:
+    tmp = resid3 * hh
+    chisq = numpy.sum(tmp*tmp)
+    err3 = math.sqrt(chisq / (hh.size-1))
+
+    print "sigma3 =", err3, "km/s"
+  else:
+    err3 = parm[PAR_S1] / hh
+
+  plt.axhline(mean3, color="red")
+
+plt.errorbar(phi, vfit, yerr=e_vfit, fmt="o", color="black")
+
+if args.triple:
+  plt.errorbar(phiorig, v3, yerr=err3, fmt="o", color="black")
+
+plt.xlim(phimin, phimax)
+
+plt.ylabel("Vrad (km/s)")
+
+plt.subplot(2, 1, 2)
+
+ymod = numpy.empty_like(vfit)
+fit_func(vfinal, ymod)
+
+resid = vfit-ymod
+
+chisq = numpy.sum((resid / e_vfit)**2)
+
+print "Final chi squared =", chisq, "ndof =", ndof
+
+rmin1 = numpy.min(resid[0:nobs]-e_vfit[0:nobs])
+rmax2 = numpy.max(resid[nobs:2*nobs]+e_vfit[nobs:2*nobs])
+
+if args.triple:
+  rmin2 = numpy.min(resid[nobs:2*nobs]-e_vfit[nobs:2*nobs])
+  rmax3 = numpy.max(resid3+err3)
+  
+  roff2 = 1.1*min(rmin1 - rmax2, rmin2 - rmax3)
+  roff3 = 2*roff2
+else:
+  roff2 = 1.1*(rmin1 - rmax2)
+
+plt.errorbar(phi[0:nobs], resid[0:nobs], yerr=e_vfit[0:nobs], fmt="o", color="black")
+plt.axhline(0, color="blue")
+plt.errorbar(phi[nobs:2*nobs], roff2+resid[nobs:2*nobs], yerr=e_vfit[nobs:2*nobs], fmt="o", color="black")
+plt.axhline(roff2, color="green")
+
+if args.triple:
+  plt.errorbar(phiorig, roff3+resid3, yerr=err3, fmt="o", color="black")
+  plt.axhline(roff3, color="red")
+
+plt.xlim(phimin, phimax)
+
+plt.xlabel("Phase")
+plt.ylabel("Residual + const (km/s)")
+
+plt.tight_layout()
+
+if args.m is None:
+  plt.show()
+else:
+  fig = plt.gcf()
+  fig.savefig(args.m + "_orbit.pdf")
+  fig.savefig(args.m + "_orbit.eps")
+
