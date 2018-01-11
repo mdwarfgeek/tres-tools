@@ -16,8 +16,6 @@ from sb1 import *
 
 import fussyastronomer
 
-GMJUP = 1.2668653e17  # m^3 s^-2
-
 # Deal with command-line arguments.
 ap = argparse.ArgumentParser()
 ap.add_argument("pset", help="parameter file")
@@ -443,7 +441,7 @@ if args.m is not None:
                   parm[PAR_K1])
 
     # Solve for mass ratio, secondary mass and semimajor axis.
-    omega = 2.0*math.pi / (parm[eb.PAR_P] * 86400.0)
+    omega = eb.TWOPI / (parm[eb.PAR_P] * eb.DAY)
 
     q = qfromsb1(parm[eb.PAR_ESINW], parm[eb.PAR_ECOSW],
                  parm[eb.PAR_P],
@@ -455,7 +453,7 @@ if args.m is not None:
 
     m2 = m1 * q
 
-    vder[isamp,:] = [ecc, argper, tperi, a1sini, f1, q, semmaj/eb.AU, m2, m2*eb.GMSUN/GMJUP]
+    vder[isamp,:] = [ecc, argper, tperi, a1sini, f1, q, semmaj/eb.AU, m2, m2*eb.GMSUN/eb.GMJUP]
 
   print >>lfp, "Derived parameters:"
   print "Derived parameters:"
