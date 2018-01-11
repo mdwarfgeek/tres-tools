@@ -13,6 +13,8 @@ import matplotlib
 
 from nlfit import *
 
+import fussyastronomer
+
 # Deal with command-line arguments.
 ap = argparse.ArgumentParser()
 ap.add_argument("pset", help="parameter file")
@@ -42,28 +44,34 @@ numpy.random.seed(42)
 # Build main parameter vector and metadata vectors.
 parm = numpy.zeros(eb.NPAR+3+args.s, dtype=numpy.double)
 parm_names = list(eb.parnames)
+parm_texsym = list(eb.partexsym)
 parm_units = list(eb.parunits)
 
 PAR_GAMMA = eb.NPAR
 parm_names.append("gamma")
+parm_texsym.append("\\gamma")
 parm_units.append("km/s")
 
 PAR_KTOT = eb.NPAR+1
 parm_names.append("K1+K2")
+parm_texsym.append("(K_1+K_2)")
 parm_units.append("km/s")
 
 PAR_S1 = eb.NPAR+2
 
 if args.s:
   parm_names.append("sigma1")
+  parm_texsym.append("\\sigma_1")
 else:
   parm_names.append("sigma")
+  parm_texsym.append("\\sigma")
 
 parm_units.append("km/s")
 
 if args.s:
   PAR_S2 = eb.NPAR+3
   parm_names.append("sigma2")
+  parm_texsym.append("\\sigma_2")
   parm_units.append("km/s")
 else:
   PAR_S2 = None
@@ -114,6 +122,7 @@ nobs = len(bjd)
 # Bring in fit parameters.
 plist = []
 plist_names = []
+plist_texsym = []
 plist_units = []
 fixed = []
 
@@ -151,6 +160,7 @@ with open(args.pset, "r") as fp:
       if vary > 0:
         plist.append(iparm)
         plist_names.append(name)
+        plist_texsym.append(parm_texsym[iparm])
         plist_units.append(parm_units[iparm])
 
         if vary == 1:  # 1=in LM and MC, 2=in MC only
@@ -330,12 +340,21 @@ if args.m is not None:
   numpy.save(args.m, ch, allow_pickle=False)
 
   lfp = open(args.m + "_orbit.txt", "w")
+  tfp = open(args.m + "_orbit.tex", "w")
 
   print >>lfp, "MC parameters:"
   print "MC parameters:"
 
+  print >>tfp, "\\hline"
+  print >>tfp, "MCMC parameters\\\\"
+  print >>tfp, "\\hline"
+
   vmed = numpy.empty([ndim])
   vad = numpy.empty([ndim])
+  vndp = numpy.empty([ndim], dtype=numpy.int)
+
+  ecc_kh_ndp = None
+  sigma_ndp = None
 
   for iparm in range(ndim):
     vec = ch[:,iparm]
@@ -345,8 +364,11 @@ if args.m is not None:
 
     err = numpy.percentile(ad, 68.3)
 
+    ndp = fussyastronomer.ndp(err)
+
     vmed[iparm] = med
     vad[iparm] = err
+    vndp[iparm] = ndp
 
     if plist[iparm] == eb.PAR_T0:
       med += tbase
@@ -358,6 +380,44 @@ if args.m is not None:
 
     print >>lfp, line
     print line
+
+    # Special cases of n(dp) we want to be the same.
+    if plist[iparm] == eb.PAR_ECOSW or plist[iparm] == eb.PAR_ESINW:
+      if ecc_kh_ndp is None or ndp > ecc_kh_ndp:
+        ecc_kh_ndp = ndp
+    elif plist[iparm] == PAR_S1 or (PAR_S2 is not None and plist[iparm] == PAR_S2):
+      if sigma_ndp is None or ndp > sigma_ndp:
+        sigma_ndp = ndp
+
+  # TeX output.
+  for iparm in range(ndim):
+    med = vmed[iparm]
+    err = vad[iparm]
+
+    if plist[iparm] == eb.PAR_T0:
+      med += tbase
+
+    if plist[iparm] == eb.PAR_ECOSW or plist[iparm] == eb.PAR_ESINW:
+      ndp = ecc_kh_ndp
+    elif plist[iparm] == PAR_S1 or (PAR_S2 is not None and plist[iparm] == PAR_S2):
+      ndp = sigma_ndp
+    else:
+      ndp = vndp[iparm]
+
+    parstr = "$" + plist_texsym[iparm] + "$"
+    if plist_units[iparm] != "":
+      utex = plist_units[iparm]
+
+      if utex == "Msol":
+        utex = "${\\rm M}_\\odot$"
+
+      parstr += " (" + utex + ")"
+
+    texline = "{0:<36} & ${1:s} \\pm {2:s}$ \\\\".format(parstr,
+                                                         fussyastronomer.format(med, ndp),
+                                                         fussyastronomer.format(err, ndp))
+
+    print >>tfp, texline
 
   # Argument and phase of periastron need special treatment.
   parm[plist] = vmed
@@ -371,14 +431,12 @@ if args.m is not None:
   dermap = [eb.PAR_E, eb.PAR_OMEGA, eb.PAR_A, eb.PAR_MTOT, eb.PAR_M1, eb.PAR_M2]
 
   dernames = ["e", "omega", "a sin i", "(M_1+M_2) sin^3 i", "M_1 sin^3 i", "M_2 sin^3 i", "Tperi"]
-  derunits = [None] * len(dernames)
+  dertexsym = ["e", "\\omega", "a \\sin i", "(M_1+M_2) \\sin^3 i", "M_1 \\sin^3 i", "M_2 \\sin^3 i", "T_{\\rm peri}"]
+  derunits = ["", "deg", "AU", "Msol", "Msol", "Msol", "BJD"]
 
-  for ipar, jpar in enumerate(dermap):
-    derunits[ipar] = eb.derunits[jpar]
+  nder = len(dernames)
 
-  derunits[len(dermap)] = "BJD"
-
-  vder = numpy.empty([nsamp, len(dernames)])
+  vder = numpy.empty([nsamp, nder])
   mkvec = numpy.empty([nsamp])
 
   for isamp in range(nsamp):
@@ -386,6 +444,10 @@ if args.m is not None:
     parm[plist] = thissamp
 
     thisvder = eb.getvder(parm, parm[PAR_GAMMA], parm[PAR_KTOT])
+
+    # Change units of semimajor axis from Rsol to AU for consistency
+    # with SB1 program outputs.
+    thisvder[eb.PAR_A] *= eb.RSUN / eb.AU
 
     # Force correct revolution for omega by wrapping delta into (-pi,pi].
     domega = thisvder[eb.PAR_OMEGA] - theomega
@@ -407,6 +469,16 @@ if args.m is not None:
   print >>lfp, "Derived parameters:"
   print "Derived parameters:"
 
+  print >>tfp, "\\hline"
+  print >>tfp, "Derived parameters\\\\"
+  print >>tfp, "\\hline"
+
+  vdermed = numpy.empty([nder])
+  vderad = numpy.empty([nder])
+  vderndp = numpy.empty([nder], dtype=numpy.int)
+
+  mass_ndp = None
+
   for ipar, name in enumerate(dernames):
     unit = derunits[ipar]
 
@@ -417,6 +489,12 @@ if args.m is not None:
 
     err = numpy.percentile(ad, 68.3)
 
+    ndp = fussyastronomer.ndp(err)
+
+    vdermed[ipar] = med
+    vderad[ipar] = err
+    vderndp[ipar] = ndp
+
     if name == "Tperi":
       med += tbase
 
@@ -425,7 +503,44 @@ if args.m is not None:
     print >>lfp, line
     print line
 
+    # Special cases of n(dp) we want to be the same.
+    if ipar < len(dermap) and (dermap[ipar] == eb.PAR_MTOT or dermap[ipar] == eb.PAR_M1 or dermap[ipar] == eb.PAR_M2):
+      if mass_ndp is None or ndp > mass_ndp:
+        mass_ndp = ndp
+
+  # TeX output.
+  for ipar in range(nder):
+    unit = derunits[ipar]
+
+    med = vdermed[ipar]
+    err = vderad[ipar]
+
+    if dernames[ipar] == "Tperi":
+      med += tbase
+
+    if ipar < len(dermap) and (dermap[ipar] == eb.PAR_MTOT or dermap[ipar] == eb.PAR_M1 or dermap[ipar] == eb.PAR_M2):
+      ndp = mass_ndp
+    else:
+      ndp = vderndp[ipar]
+
+    parstr = "$" + dertexsym[ipar] + "$"
+    if unit != "":
+      utex = unit
+
+      if utex == "Msol":
+        utex = "${\\rm M}_\\odot$"
+
+      parstr += " (" + utex + ")"
+
+    texline = "{0:<36} & ${1:s} \\pm {2:s}$ \\\\".format(parstr,
+                                                         fussyastronomer.format(med, ndp),
+                                                         fussyastronomer.format(err, ndp))
+
+    print >>tfp, texline
+
+
   lfp.close()
+  tfp.close()
 
   # Update parameters.
   parm[plist] = vmed
