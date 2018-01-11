@@ -423,6 +423,8 @@ if args.m is not None:
   parm[plist] = vmed
 
   theomega = math.degrees(math.atan2(parm[eb.PAR_ESINW], parm[eb.PAR_ECOSW]))
+  if theomega < 0.0:  # wrap to conventional range [0,360)
+    theomega += 360.0
   thephiperi = eb.phiperi(parm)
 
   # Derived parameters.

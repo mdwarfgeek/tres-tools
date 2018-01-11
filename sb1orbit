@@ -392,6 +392,9 @@ if args.m is not None:
   parm[plist] = vmed
 
   theomega = math.degrees(math.atan2(parm[eb.PAR_ESINW], parm[eb.PAR_ECOSW]))
+  if theomega < 0.0:  # wrap to conventional range [0,360)
+    theomega += 360.0
+
   thephiperi = eb.phiperi(parm)
 
   # Derived parameters.
@@ -415,6 +418,8 @@ if args.m is not None:
 
     ecc = math.hypot(esinw, ecosw)
     argper = math.degrees(math.atan2(esinw, ecosw))
+    if argper < 0.0:  # wrap to conventional range [0,360)
+      argper += 360.0
 
     # Force correct revolution for omega by wrapping delta into (-pi,pi].
     domega = argper - theomega
