@@ -512,7 +512,7 @@ if args.m is not None:
 
   ndof = vfit.size - vmed.size
 
-  print "Median rms =", parm[PAR_S]/numpy.median(hh), "km/s"
+  print "Median rms =", numpy.median(parm[PAR_S]/hh), "km/s"
 
 # Phases of observations.
 tmp = (bjdfit - parm[eb.PAR_T0]) / parm[eb.PAR_P]
@@ -573,6 +573,8 @@ ymod = numpy.empty_like(vfit)
 fit_func(vfinal, ymod)
 
 resid = vfit-ymod
+
+print "RMS of residuals =", numpy.sqrt(numpy.sum(resid**2) / ndof)
 
 chisq = numpy.sum((resid / e_vfit)**2)
 

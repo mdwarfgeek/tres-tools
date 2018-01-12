@@ -552,10 +552,10 @@ if args.m is not None:
   ndof = vfit.size - vmed.size
 
   if args.s:
-    print "Median rms(1) =", parm[PAR_S1]/numpy.median(hh), "km/s"
-    print "Median rms(2) =", parm[PAR_S2]/numpy.median(hh), "km/s"
+    print "Median rms(1) =", numpy.median(parm[PAR_S1]/hh), "km/s"
+    print "Median rms(2) =", numpy.median(parm[PAR_S2]/hh), "km/s"
   else:
-    print "Median rms =", parm[PAR_S1]/numpy.median(hh), "km/s"
+    print "Median rms =", numpy.median(parm[PAR_S1]/hh), "km/s"
 
 # Phases of observations.
 tmp = (bjdfit - parm[eb.PAR_T0]) / parm[eb.PAR_P]
