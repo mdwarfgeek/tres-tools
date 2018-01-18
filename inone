@@ -44,9 +44,9 @@ kreg = 100
 
 # Limb darkening coefficients for rotational broadening kernel.
 # These are from Phoenix mod. atm. for Teff=3224K, logg=5, Rc band,
-# from Claret (2000) 2000A+A...363.1081C
-ald = 0.3729
-bld = 0.4561
+# least-squares method, Claret et al. (2012) 2012A&A...546A..14C
+ald = 0.4629
+bld = 0.3212
 
 def do_vrad(pdf, tmplname, filename,
             tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_vbcv, tmpl_vrad,
