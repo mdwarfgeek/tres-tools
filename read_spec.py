@@ -64,7 +64,10 @@ class read_spec:
       specname = "tres"
     elif "FPA" in hdr and hdr["FPA"].strip() == "CHIRON":
       specname = "chiron"
-      mode = int(hdr['MODE'])
+      if "MODE" in hdr:
+        mode = int(hdr['MODE'])
+      else:
+        mode = 0
     elif "INSTRUME" in hdr:
       val = hdr["INSTRUME"].strip()
       if val == "HARPS":
@@ -75,6 +78,8 @@ class read_spec:
         specname = "igrins"
       elif val == "ELODIE":
         specname = "elodie"
+      elif val == "FEROS":
+        specname = "feros"
 
     if specname is None:
       print >>sys.stderr, "Unrecognised instrument"
