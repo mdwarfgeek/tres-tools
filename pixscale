@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+
+import argparse
+import numpy
+import sys
+
+import lfa
+
+from prepord import *
+from read_spec import *
+
+ap = argparse.ArgumentParser()
+ap.add_argument("template")
+ap.add_argument("-o", type=int)
+args = ap.parse_args()
+
+# New read_spec structure.
+rs = read_spec()
+
+if args.o is not None:
+  rs.overrideorder = args.o
+
+# Read template.
+tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze, tmpl_vbcv, tmpl_vrad = rs.read_spec(args.template)
+
+thistmpl_wave, thistmpl_flux, thistmpl_e_flux = prepord(rs.singleorder, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk)
+
+npix = len(thistmpl_wave)
+
+cenwave = thistmpl_wave[npix//2]
+dl = thistmpl_wave[npix//2] - thistmpl_wave[npix//2-1]
+dvel = lfa.LIGHT * dl / (1000 * cenwave)
+
+print cenwave, "A", "scale =", dl, "A", dvel, "km/s"
+
