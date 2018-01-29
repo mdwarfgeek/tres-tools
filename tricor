@@ -1,0 +1,291 @@
+#!/usr/bin/env python
+
+import argparse
+import math
+import os
+import re
+import sys
+
+import numpy
+import scipy.optimize
+
+import lfa
+
+# Stop pyplot trying to use X.
+import matplotlib
+matplotlib.use('Agg')
+
+import fftrv
+import tricor
+
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
+
+from makesky import *
+from prepord import *
+from read_spec import *
+
+# Constants used by the script go here.
+
+# Parameters.
+PAR_ALPHA  = 0
+PAR_BETA   = 1
+PAR_VSINIA = 2
+PAR_VSINIB = 3
+PAR_VSINIC = 4
+NPARM      = 5
+
+# Figure size based on pgplot.
+figsize = (10.5, 7.8)  # inches
+
+# Default velocity range.
+velrange = 250  # km/s
+
+# Limb darkening coefficients for rotational broadening kernel.
+# These are from Phoenix mod. atm. for Teff=3224K, logg=5, Rc band,
+# least-squares method, Claret et al. (2012) 2012A&A...546A..14C
+ald = 0.4629
+bld = 0.3212
+
+def do_tricor(pdf, tmplaname, tmplbname, tmplcname, filename,
+              tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
+              tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
+              tmplc_mbjd, tmplc_wave, tmplc_flux, tmplc_e_flux, tmplc_msk, tmplc_vbcv, tmplc_vrad,
+              mbjd, wave, flux, e_flux, msk, vbcv,
+              vsinia, vsinib, vsinic,
+              alpha, beta, order):
+
+  # Extract order and clean.
+  thistmpla_wave, thistmpla_flux, thistmpla_e_flux = prepord(order, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk)
+  thistmplb_wave, thistmplb_flux, thistmplb_e_flux = prepord(order, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk)
+  thistmplc_wave, thistmplc_flux, thistmplc_e_flux = prepord(order, tmplc_wave, tmplc_flux, tmplc_e_flux, tmplc_msk)
+  thiswave, thisflux, thise_flux = prepord(order, wave, flux, e_flux, msk)
+
+  # Take off sky.
+  ss = makesky(thistmpla_wave, thistmpla_flux, 4)
+
+  thistmpla_flux -= ss
+
+  ss = makesky(thistmplb_wave, thistmplb_flux, 4)
+
+  thistmplb_flux -= ss
+
+  ss = makesky(thistmplc_wave, thistmplc_flux, 4)
+
+  thistmplc_flux -= ss
+
+  thisrawflux = numpy.copy(thisflux)
+
+  ss = makesky(thiswave, thisflux, 4)
+
+  thisflux -= ss
+
+  # Number of measurements (pixels).
+  npix = len(thisflux)
+
+  # Set up FFT sampling.  Muitiple-lined solutions seem to benefit
+  # from a bit less aggressive filtering, so reduce that.
+  nbin = 32*npix
+  filtl = int(npix/3)    # taper start 3 pix
+  filth = int(npix/1.5)  # taper end 1.5 pix
+
+  frv = fftrv.fftrv(nbin=nbin,
+                    top_nrun=filtl,
+                    nrun=filth,
+                    pkfit=0)
+
+  tc = tricor.tricor(frv,
+                     thistmpla_wave, thistmpla_flux,
+                     thistmplb_wave, thistmplb_flux,
+                     thistmplc_wave, thistmplc_flux,
+                     thiswave, thisflux,
+                     vsinia, vsinib, vsinic,
+                     alpha, beta,
+                     ald, bld)
+
+  va, vb, vc, h = tc.run(minvela, maxvela,
+                         minvelb, maxvelb,
+                         minvelc, maxvelc)
+
+  return va, vb, vc, h
+
+def do_optimize(filelist, targlist, optlist, init_parm):
+
+  nfit = len(optlist)
+
+  # Standard bounds.
+  parm_bounds = [None] * NPARM
+  parm_bounds[PAR_ALPHA]  = (0.01, 1.0)
+  parm_bounds[PAR_BETA]   = (0.01, 1.0)
+  parm_bounds[PAR_VSINIA] = (0.0, None)
+  parm_bounds[PAR_VSINIB] = (0.0, None)
+  parm_bounds[PAR_VSINIC] = (0.0, None)
+
+  # Make vector of fit parameters.
+  vinit = init_parm[optlist]
+  vbounds = [ parm_bounds[i] for i in optlist ]
+
+  def fit_func(p):
+    ssqh = 0
+
+    trial_parm = numpy.copy(init_parm)
+    trial_parm[optlist] = p
+
+    for ifile, filename in enumerate(filelist):
+      mbjd, wave, flux, e_flux, msk, blaze, vbcv, dumvrad = targlist[ifile]
+
+      xbest, ybest, zbest, hbest = do_tricor(None, tmplaname, tmplbname, tmplcname, filename,
+                                             tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
+                                             tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
+                                             tmplc_mbjd, tmplc_wave, tmplc_flux, tmplc_e_flux, tmplc_msk, tmplc_vbcv, tmplc_vrad,
+                                             mbjd, wave, flux, e_flux, msk, vbcv,
+                                             trial_parm[PAR_VSINIA],
+                                             trial_parm[PAR_VSINIB],
+                                             trial_parm[PAR_VSINIC],
+                                             trial_parm[PAR_ALPHA],
+                                             trial_parm[PAR_BETA],
+                                             order=rs.singleorder)
+
+      ssqh += hbest*hbest
+
+    print >>sys.stderr, "Trial:", trial_parm, "ssqh =", ssqh
+
+    return -ssqh
+
+  vfit = scipy.optimize.fmin_slsqp(fit_func,
+                                   vinit,
+                                   bounds=vbounds,
+                                   epsilon=0.01)
+
+  final_parm = numpy.copy(init_parm)
+  final_parm[optlist] = vfit
+
+  print "L_2/L_1 = {0:.4f}".format(final_parm[PAR_ALPHA])
+  print "L_3/L_1 = {0:.4f}".format(final_parm[PAR_BETA])
+  print "vsinia  = {0:.4f}".format(final_parm[PAR_VSINIA])
+  print "vsinib  = {0:.4f}".format(final_parm[PAR_VSINIB])
+  print "vsinic  = {0:.4f}".format(final_parm[PAR_VSINIC])
+
+  return final_parm
+
+def do_fixed(filelist, targlist, parm, dopdf=False):
+  ssqh = 0
+
+  for ifile, filename in enumerate(filelist):
+    mbjd, wave, flux, e_flux, msk, blaze, vbcv, dumvrad = targlist[ifile]
+
+    if dopdf:
+      basefile = stripname(filename)
+      outfile = basefile + "_tricor.pdf"
+      
+      pdf = PdfPages(outfile)
+    else:
+      pdf = None
+
+    # Velocities.
+    xbest, ybest, zbest, hbest = do_tricor(pdf, tmplaname, tmplbname, tmplcname, filename,
+                                           tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
+                                           tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
+                                           tmplc_mbjd, tmplc_wave, tmplc_flux, tmplc_e_flux, tmplc_msk, tmplc_vbcv, tmplc_vrad,
+                                           mbjd, wave, flux, e_flux, msk, vbcv,
+                                           parm[PAR_VSINIA],
+                                           parm[PAR_VSINIB],
+                                           parm[PAR_VSINIC],
+                                           parm[PAR_ALPHA],
+                                           parm[PAR_BETA],
+                                           order=rs.singleorder)
+    
+    if pdf is not None:
+      pdf.close()
+    
+    print "{0:12.4f} {1:8.3f} {2:8.3f} {3:8.3f} {4:9.6f}".format(lfa.ZMJD+mbjd, xbest, ybest, zbest, hbest)
+
+    ssqh += hbest*hbest
+
+  return ssqh
+
+def get_range(s):
+  ll = s.split(":")
+  if len(ll) == 2:
+    return map(float, ll)
+  else:
+    raise argparse.ArgumentError
+
+ap = argparse.ArgumentParser()
+ap.add_argument("alpha")
+ap.add_argument("beta")
+ap.add_argument("vsinia")
+ap.add_argument("vsinib")
+ap.add_argument("vsinic")
+ap.add_argument("tmpla")
+ap.add_argument("tmplb")
+ap.add_argument("tmplc")
+ap.add_argument("filelist", metavar="file", nargs="+")
+ap.add_argument("--alim", type=get_range, default=[-velrange, velrange])
+ap.add_argument("--blim", type=get_range, default=[-velrange, velrange])
+ap.add_argument("--clim", type=get_range, default=[-velrange, velrange])
+ap.add_argument("-a")
+ap.add_argument("-o", type=int)
+ap.add_argument("-p", action='store_true')
+args = ap.parse_args()
+
+# New read_spec structure.
+rs = read_spec()
+
+if args.o is not None:
+  rs.overrideorder = args.o
+
+# Read templates.
+tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_blaze, tmpla_vbcv, tmpla_vrad = rs.read_spec(args.tmpla, istmpl=1)
+tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_blaze, tmplb_vbcv, tmplb_vrad = rs.read_spec(args.tmplb, istmpl=1)
+tmplc_mbjd, tmplc_wave, tmplc_flux, tmplc_e_flux, tmplc_msk, tmplc_blaze, tmplc_vbcv, tmplc_vrad = rs.read_spec(args.tmplc, istmpl=1)
+
+parm = numpy.empty([NPARM], dtype=numpy.double)
+
+parm[PAR_ALPHA]  = float(args.alpha)
+parm[PAR_BETA]   = float(args.beta)
+parm[PAR_VSINIA] = float(args.vsinia)
+parm[PAR_VSINIB] = float(args.vsinib)
+parm[PAR_VSINIC] = float(args.vsinic)
+
+tmplaname = os.path.basename(args.tmpla)
+tmplbname = os.path.basename(args.tmplb)
+tmplcname = os.path.basename(args.tmplc)
+
+filelist = args.filelist
+nf = len(args.filelist)
+
+# Read targets.
+targlist = [None] * nf
+for ifile, filename in enumerate(filelist):
+  targlist[ifile] = rs.read_spec(filename)
+
+minvela, maxvela = args.alim
+minvelb, maxvelb = args.blim
+minvelc, maxvelc = args.clim
+
+if args.a is not None:
+  inplist = [ s.strip() for s in args.a.split(",") ]
+
+  # List of pars we can optimize, used to clean up user inputs.
+  pars = { "alpha":    PAR_ALPHA,
+           "l2overl1": PAR_ALPHA,
+           "beta":     PAR_BETA,
+           "l3overl1": PAR_BETA,
+           "vsinia":   PAR_VSINIA,
+           "vsini1":   PAR_VSINIA,
+           "vsinib":   PAR_VSINIB,
+           "vsini2":   PAR_VSINIB,
+           "vsinic":   PAR_VSINIC,
+           "vsini3":   PAR_VSINIC }
+
+  optlist = [ pars[s.lower()] for s in inplist ]
+
+  parm = do_optimize(filelist, targlist, optlist, parm)
+
+ssqh = do_fixed(filelist, targlist, parm, args.p)
+
+print >>sys.stderr, "Sum of h^2 =", ssqh
+
+sys.exit(0)
+

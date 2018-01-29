@@ -7,6 +7,7 @@ import re
 import sys
 
 import numpy
+import scipy.optimize
 
 import lfa
 
@@ -15,15 +16,12 @@ import matplotlib
 matplotlib.use('Agg')
 
 import fftrv
+import todcor
 
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 
-from scipy.interpolate import InterpolatedUnivariateSpline
-
-from medsig import *
 from poly import *
-from quad2d import *
 
 from makesky import *
 from prepord import *
@@ -31,11 +29,17 @@ from read_spec import *
 
 # Constants used by the script go here.
 
+# Parameters.
+PAR_ALPHA  = 0
+PAR_VSINIA = 1
+PAR_VSINIB = 2
+NPARM      = 3
+
 # Figure size based on pgplot.
 figsize = (10.5, 7.8)  # inches
 
-# Velocity range to plot
-velrange = 200  # km/s, plots +/- this much
+# Default velocity range.
+velrange = 250  # km/s
 
 # Limb darkening coefficients for rotational broadening kernel.
 # These are from Phoenix mod. atm. for Teff=3224K, logg=5, Rc band,
@@ -43,70 +47,11 @@ velrange = 200  # km/s, plots +/- this much
 ald = 0.4629
 bld = 0.3212
 
-def todplot(h, velsa, velsb, xbest, ybest):
-  plt.imshow(h.T,
-             interpolation='none',
-             extent=[velsa[0], velsa[-1],
-                     velsb[-1], velsb[0]])
-  plt.xlim(velsa[0], velsa[-1])
-  plt.ylim(velsb[0], velsb[-1])
-  plt.axvline(xbest, color='white')
-  plt.axhline(ybest, color='white')
-  plt.xlabel("Primary velocity (km/s)")
-  plt.ylabel("Secondary velocity (km/s)")
-  plt.show()
-
-def todreg(dd, iabest, ibbest, velsa, velsb, c_targ_tmpla, c_targ_tmplb, spl, alp):
-  nvelsa = len(velsa)
-
-  ial = iabest - dd
-  if ial < 0:
-    ial = 0
-
-  iah = iabest + dd
-  if iah >= nvelsa:
-    iah = nvelsa-1
-
-  nvelsb = len(velsb)
-
-  ibl = ibbest - dd
-  if ibl < 0:
-    ibl = 0
-
-  ibh = ibbest + dd
-  if ibh >= nvelsb:
-    ibh = nvelsb-1
-
-  ialist = numpy.arange(ial, iah+1, 1)
-  iblist = numpy.arange(ibl, ibh+1, 1)
-
-  xx = numpy.empty([ len(ialist), len(iblist) ], dtype=numpy.double)
-  yy = numpy.empty_like(xx)
-  zz = numpy.empty_like(xx)
-
-  valist = velsa[ialist]
-
-  for ibd, ib in enumerate(iblist):
-    vb = velsb[ib]
-
-    dv = vb - valist
-
-    c_tmplb_tmpla = spl(dv)
-
-    denom = numpy.sqrt(1.0 + 2*alp*c_tmplb_tmpla + alp*alp)
-    h = (c_targ_tmpla[ialist] + alp * c_targ_tmplb[ib]) / denom
-
-    xx[:,ibd] = valist
-    yy[:,ibd] = vb
-    zz[:,ibd] = h
-
-  return xx, yy, zz
-
-def todcor(pdf, tmplaname, tmplbname, filename,
-           tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
-           tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
-           mbjd, wave, flux, e_flux, msk, vbcv,
-           vsinia, vsinib, lrat, order):
+def do_todcor(pdf, tmplaname, tmplbname, filename,
+              tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
+              tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
+              mbjd, wave, flux, e_flux, msk, vbcv,
+              vsinia, vsinib, alpha, order):
 
   # Extract order and clean.
   thistmpla_wave, thistmpla_flux, thistmpla_e_flux = prepord(order, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk)
@@ -132,7 +77,7 @@ def todcor(pdf, tmplaname, tmplbname, filename,
   npix = len(thisflux)
 
   # Set up FFT sampling.  Double-lined solutions seem to benefit
-  # from a bit less agressive filtering, so reduce that.
+  # from a bit less aggressive filtering, so reduce that.
   nbin = 32*npix
   filtl = int(npix/3)    # taper start 3 pix
   filth = int(npix/1.5)  # taper end 1.5 pix
@@ -142,97 +87,142 @@ def todcor(pdf, tmplaname, tmplbname, filename,
                     nrun=filth,
                     pkfit=0)
 
-  # Template x template.
-  zt, corrt, zbestt, hbestt, sigtb = frv.correlate(thistmplb_wave, thistmplb_flux,
-                                                   thistmpla_wave, thistmpla_flux,
-                                                   vsinib*1000/lfa.LIGHT,
-                                                   ald, bld,
-                                                   zbroadt=vsinia*1000/lfa.LIGHT)
-  
-  # Template x target.
-  za, corra, zbesta, hbesta, sigta = frv.correlate(thistmpla_wave, thistmpla_flux,
-                                                   thiswave, thisflux,
-                                                   vsinia*1000/lfa.LIGHT,
-                                                   ald, bld)
-  
-  zb, corrb, zbestb, hbestb, sigtb = frv.correlate(thistmplb_wave, thistmplb_flux,
-                                                   thiswave, thisflux,
-                                                   vsinib*1000/lfa.LIGHT,
-                                                   ald, bld)
-  
-  alp = lrat * sigtb/sigta
-      
-#  print >>sys.stderr, 'alp =', alp
-  
-  velst = zt * lfa.LIGHT / 1000
-  velsa = za * lfa.LIGHT / 1000
-  velsb = zb * lfa.LIGHT / 1000
-  
-  maxvel = 250
-  
-  ww = numpy.abs(velst) < 2*maxvel
-  
-  spl = InterpolatedUnivariateSpline(velst[ww], corrt[ww], k=1)
-  
-  ww = numpy.abs(velsa) < maxvel
-  
-  velsa = velsa[ww]
-  nvelsa = len(velsa)
-  
-  c_targ_tmpla = corra[ww]
-  
-  ww = numpy.abs(velsb) < maxvel
-  
-  velsb = velsb[ww]
-  nvelsb = len(velsb)
-  
-  c_targ_tmplb = corrb[ww]
-  
-  # First, search for the global maximum.  Compute TODCOR statistic one
-  # "vb" at a time, to avoid having to store the entire thing.
-  iabest = None
-  ibbest = None
-  hbest = None
+  tc = todcor.todcor(frv,
+                     thistmpla_wave, thistmpla_flux,
+                     thistmplb_wave, thistmplb_flux,
+                     thiswave, thisflux,
+                     vsinia, vsinib,
+                     alpha,
+                     ald, bld)
 
-  for ib, vb in enumerate(velsb):
-    dv = vb - velsa
-    c_tmplb_tmpla = spl(dv)
-    
-    denom = numpy.sqrt(1.0 + 2*alp*c_tmplb_tmpla + alp*alp)
-    h = (c_targ_tmpla + alp * c_targ_tmplb[ib]) / denom
-
-    imax = h.argmax()
-    hmax = h[imax]
-
-    if hbest is None or hmax > hbest:
-      iabest = imax
-      ibbest = ib
-      hbest = hmax
-
-  # Fit quadratic to region around peak.
-  xx, yy, zz = todreg(1, iabest, ibbest, velsa, velsb, c_targ_tmpla, c_targ_tmplb, spl, alp)
-
-  xbest, ybest, zbest = quad2d(xx, yy, zz)
+  va, vb, h = tc.run(minvela, maxvela,
+                     minvelb, maxvelb)
 
   if pdf is not None:
     fig = plt.figure(figsize=figsize)
-    
-    xx, yy, zz = todreg(250, iabest, ibbest, velsa, velsb, c_targ_tmpla, c_targ_tmplb, spl, alp)
-    todplot(zz,
-            velsa[iabest-250:iabest+250],
-            velsb[ibbest-250:ibbest+250],
-            xbest, ybest)
-    
+
+    # Sampling: power of 2.
+    ishft = int(math.log(nbin / 1024.0, 2))
+    if ishft < 0:
+      ishft = 0
+
+    samp = 1<<ishft
+
+    # Adjust endpoints to be on same grid.
+    iamin = (tc.vel2ind(minvela) // samp) * samp + samp//2
+    iamax = (tc.vel2ind(maxvela) // samp) * samp + samp//2
+    ibmin = (tc.vel2ind(minvelb) // samp) * samp + samp//2
+    ibmax = (tc.vel2ind(maxvelb) // samp) * samp + samp//2
+
+    hh = tc.calc(iamin, iamax, samp,
+                 ibmin, ibmax, samp)
+
+    # Actual velocity range.
+    amin = tc.ind2vel(iamin)
+    amax = tc.ind2vel(iamax)
+    bmin = tc.ind2vel(ibmin)
+    bmax = tc.ind2vel(ibmax)
+
+    plt.subplot(1, 2, 1)
+
+    plt.imshow(hh.T,
+               interpolation='none',
+               extent=[amin, amax, bmax, bmin])
+    plt.xlim(amin, amax)
+    plt.ylim(bmin, bmax)
+    plt.axvline(va, color='white')
+    plt.axhline(vb, color='white')
+    plt.xlabel("Primary velocity (km/s)")
+    plt.ylabel("Secondary velocity (km/s)")
+
+    # Full res around peak.
+    iamin = tc.vel2ind(va) - 512
+    iamax = tc.vel2ind(va) + 512
+    ibmin = tc.vel2ind(vb) - 512
+    ibmax = tc.vel2ind(vb) + 512
+
+    hh = tc.calc(iamin, iamax, 1,
+                 ibmin, ibmax, 1)
+
+    amin = tc.ind2vel(iamin)
+    amax = tc.ind2vel(iamax)
+    bmin = tc.ind2vel(ibmin)
+    bmax = tc.ind2vel(ibmax)
+
+    plt.subplot(1, 2, 2)
+
+    plt.imshow(hh.T,
+               interpolation='none',
+               extent=[amin, amax, bmax, bmin])
+    plt.xlim(amin, amax)
+    plt.ylim(bmin, bmax)
+    plt.axvline(va, color='white')
+    plt.axhline(vb, color='white')
+    plt.xlabel("Primary velocity (km/s)")
+    plt.ylabel("Secondary velocity (km/s)")
+
     pdf.savefig(fig)
     plt.close()
 
-  return xbest, ybest, hbest
+  return va, vb, h
 
-def do_todcor(filelist, lrat, vsinia, vsinib, dopdf=False):
+def do_optimize(filelist, targlist, optlist, init_parm):
+
+  nfit = len(optlist)
+
+  # Standard bounds.
+  parm_bounds = [None] * NPARM
+  parm_bounds[PAR_ALPHA]  = (0.01, 1.0)
+  parm_bounds[PAR_VSINIA] = (0.0, None)
+  parm_bounds[PAR_VSINIB] = (0.0, None)
+
+  # Make vector of fit parameters.
+  vinit = init_parm[optlist]
+  vbounds = [ parm_bounds[i] for i in optlist ]
+
+  def fit_func(p):
+    ssqh = 0
+
+    trial_parm = numpy.copy(init_parm)
+    trial_parm[optlist] = p
+
+    for ifile, filename in enumerate(filelist):
+      mbjd, wave, flux, e_flux, msk, blaze, vbcv, dumvrad = targlist[ifile]
+
+      xbest, ybest, hbest = do_todcor(None, tmplaname, tmplbname, filename,
+                                      tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
+                                      tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
+                                      mbjd, wave, flux, e_flux, msk, vbcv,
+                                      trial_parm[PAR_VSINIA],
+                                      trial_parm[PAR_VSINIB],
+                                      trial_parm[PAR_ALPHA],
+                                      order=rs.singleorder)
+
+      ssqh += hbest*hbest
+
+    print >>sys.stderr, "Trial:", trial_parm, "ssqh =", ssqh
+
+    return -ssqh
+
+  vfit = scipy.optimize.fmin_slsqp(fit_func,
+                                   vinit,
+                                   bounds=vbounds,
+                                   epsilon=0.01)
+
+  final_parm = numpy.copy(init_parm)
+  final_parm[optlist] = vfit
+
+  print "L_2/L_1 = {0:.4f}".format(final_parm[PAR_ALPHA])
+  print "vsinia  = {0:.4f}".format(final_parm[PAR_VSINIA])
+  print "vsinib  = {0:.4f}".format(final_parm[PAR_VSINIB])
+
+  return final_parm
+
+def do_fixed(filelist, targlist, parm, dopdf=False):
   ssqh = 0
 
   for ifile, filename in enumerate(filelist):
-    mbjd, wave, flux, e_flux, msk, blaze, vbcv, dumvrad = rs.read_spec(filename)
+    mbjd, wave, flux, e_flux, msk, blaze, vbcv, dumvrad = targlist[ifile]
     
     if dopdf:
       basefile = stripname(filename)
@@ -243,29 +233,41 @@ def do_todcor(filelist, lrat, vsinia, vsinib, dopdf=False):
       pdf = None
 
     # Velocities.
-    xbest, ybest, hbest = todcor(pdf, tmplaname, tmplbname, filename,
-                                 tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
-                                 tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
-                                 mbjd, wave, flux, e_flux, msk, vbcv,
-                                 vsinia, vsinib, lrat,
-                                 order=rs.singleorder)
+    xbest, ybest, hbest = do_todcor(pdf, tmplaname, tmplbname, filename,
+                                    tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
+                                    tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
+                                    mbjd, wave, flux, e_flux, msk, vbcv,
+                                    parm[PAR_VSINIA],
+                                    parm[PAR_VSINIB],
+                                    parm[PAR_ALPHA],
+                                    order=rs.singleorder)
     
     if pdf is not None:
       pdf.close()
     
-    print "{0:12.4f} {1:8.3f} {2:8.3f} {3:6.3f}".format(lfa.ZMJD+mbjd, xbest, ybest, hbest)
+    print "{0:12.4f} {1:8.3f} {2:8.3f} {3:9.6f}".format(lfa.ZMJD+mbjd, xbest, ybest, hbest)
 
     ssqh += hbest*hbest
 
   return ssqh
 
+def get_range(s):
+  ll = s.split(":")
+  if len(ll) == 2:
+    return map(float, ll)
+  else:
+    raise argparse.ArgumentError
+
 ap = argparse.ArgumentParser()
-ap.add_argument("lrat")
+ap.add_argument("alpha")
 ap.add_argument("vsinia")
 ap.add_argument("vsinib")
 ap.add_argument("tmpla")
 ap.add_argument("tmplb")
 ap.add_argument("filelist", metavar="file", nargs="+")
+ap.add_argument("--alim", type=get_range, default=[-velrange, velrange])
+ap.add_argument("--blim", type=get_range, default=[-velrange, velrange])
+ap.add_argument("-a")
 ap.add_argument("-o", type=int)
 ap.add_argument("-p", action="store_true")
 args = ap.parse_args()
@@ -280,15 +282,26 @@ if args.o is not None:
 tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_blaze, tmpla_vbcv, tmpla_vrad = rs.read_spec(args.tmpla, istmpl=1)
 tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_blaze, tmplb_vbcv, tmplb_vrad = rs.read_spec(args.tmplb, istmpl=1)
 
-vsinia = float(args.vsinia)
-vsinib = float(args.vsinib)
+parm = numpy.empty([NPARM], dtype=numpy.double)
+
+parm[PAR_VSINIA] = float(args.vsinia)
+parm[PAR_VSINIB] = float(args.vsinib)
+
 tmplaname = os.path.basename(args.tmpla)
 tmplbname = os.path.basename(args.tmplb)
 
 filelist = args.filelist
 nf = len(args.filelist)
 
-m = re.match(r'^([^\-]+)\-([^\-]+)$', args.lrat)
+# Read targets.
+targlist = [None] * nf
+for ifile, filename in enumerate(filelist):
+  targlist[ifile] = rs.read_spec(filename)
+
+minvela, maxvela = args.alim
+minvelb, maxvelb = args.blim
+
+m = re.match(r'^([^\-]+)\-([^\-]+)$', args.alpha)
 if m:
   lrat1 = float(m.group(1))
   lrat2 = float(m.group(2))
@@ -298,7 +311,11 @@ if m:
   
   for ilrat, thislrat in enumerate(l_lrat):
     print "L2/L1 =", thislrat
-    ssqh = do_todcor(filelist, l_lrat[ilrat], vsinia, vsinib)
+
+    trial_parm = numpy.copy(parm)
+    trial_parm[PAR_ALPHA] = l_lrat[ilrat]
+
+    ssqh = do_fixed(filelist, targlist, trial_parm)
     l_ssqh[ilrat] = ssqh
 
   coef = numpy.polynomial.polynomial.polyfit(l_lrat, l_ssqh, 2)
@@ -337,8 +354,24 @@ if m:
 
   pdf.close()
 else:
-  lrat = float(args.lrat)
-  ssqh = do_todcor(filelist, lrat, vsinia, vsinib, args.p)
+  parm[PAR_ALPHA]  = float(args.alpha)
+
+  if args.a is not None:
+    inplist = [ s.strip() for s in args.a.split(",") ]
+
+    # List of pars we can optimize, used to clean up user inputs.
+    pars = { "alpha":    PAR_ALPHA,
+             "l2overl1": PAR_ALPHA,
+             "vsinia":   PAR_VSINIA,
+             "vsini1":   PAR_VSINIA,
+             "vsinib":   PAR_VSINIB,
+             "vsini2":   PAR_VSINIB }
+    
+    optlist = [ pars[s.lower()] for s in inplist ]
+
+    parm = do_optimize(filelist, targlist, optlist, parm)
+
+  ssqh = do_fixed(filelist, targlist, parm, args.p)
 
 sys.exit(0)
 
