@@ -573,11 +573,11 @@ def do_ews(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze,
   return ewha, e_ewha, ewcai, e_ewcai
 
 ap = argparse.ArgumentParser()
-ap.add_argument("template")
-ap.add_argument("filelist", metavar="file", nargs="+")
-ap.add_argument("-f", action="store_true")
-ap.add_argument("-o", type=int)
-ap.add_argument("-r", type=float)
+ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
+ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
+ap.add_argument("-f", action="store_true", help="save correlations and LSDs to ascii files")
+ap.add_argument("-o", type=int, help="override order number used for analysis")
+ap.add_argument("-r", metavar="vsini", type=float, help="use fixed rotation for final velocity analysis")
 args = ap.parse_args()
 
 # New read_spec structure.

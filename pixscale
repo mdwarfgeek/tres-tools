@@ -10,8 +10,8 @@ from prepord import *
 from read_spec import *
 
 ap = argparse.ArgumentParser()
-ap.add_argument("template")
-ap.add_argument("-o", type=int)
+ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
+ap.add_argument("-o", type=int, help="override order number used for analysis")
 args = ap.parse_args()
 
 # New read_spec structure.

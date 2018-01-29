@@ -253,12 +253,16 @@ def do_multi_vrad(pdf, tmplname, filename,
   return mean_vrad, e_mean_vrad
 
 ap = argparse.ArgumentParser()
-ap.add_argument("template")
-ap.add_argument("filelist", metavar="file", nargs="+")
+ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
+ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
+ap.add_argument("-o", type=int, help="override order number used for analysis")
 args = ap.parse_args()
 
 # New read_spec structure.
 rs = read_spec()
+
+if args.o is not None:
+  rs.overrideorder = args.o
 
 # Read epoch to use as template.
 tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze, tmpl_vbcv, tmpl_vrad = rs.read_spec(args.template)
