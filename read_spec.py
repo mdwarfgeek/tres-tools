@@ -152,9 +152,9 @@ class read_spec:
       for i, filename in enumerate(filelist[1:]):
         thismbjd, thiszb, thisexptime, thiswave, thisflux, thise_flux, thisblaze = self.read(filename, self.obs)
 
-        mbjdlist[i] = thismbjd
-        zblist[i] = thiszb
-        exptimelist[i] = thisexptime
+        mbjdlist[i+1] = thismbjd
+        zblist[i+1] = thiszb
+        exptimelist[i+1] = thisexptime
 
         for iord in range(nord):
           interp_flux, interp_e_flux = finterp(wave[iord,:], thiswave[iord,:], thisflux[iord,:], thise_flux[iord,:])
@@ -163,7 +163,7 @@ class read_spec:
           ssq[iord,:] += interp_e_flux**2
 
           if iord == normord:
-            wtlist[i] = numpy.median(interp_flux)
+            wtlist[i+1] = numpy.median(interp_flux)
 
       # Final uncertainty in sum = quadrature sum of uncertainties.
       e_flux = numpy.sqrt(ssq)
