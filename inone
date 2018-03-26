@@ -67,6 +67,9 @@ def do_vrad(pdf, tmplname, filename,
 
   thisflux -= ss
 
+  medflux, sigflux = medsig(thisflux)
+  emmask = thisflux < medflux + 5.0*sigflux
+
   # Number of measurements (pixels).
   npix = len(thisflux)
 
@@ -160,6 +163,9 @@ def do_vrad(pdf, tmplname, filename,
   else:
     plt.plot(thiswave, thisrawflux)
     plt.xlim(thiswave[0], thiswave[-1])
+    yl = numpy.min(thisrawflux[emmask])
+    yh = numpy.max(thisrawflux[emmask])
+    plt.ylim(yl-0.05*(yh-yl), yh+0.05*(yh-yl))
     plt.xlabel("Wavelength (A)")
     plt.ylabel("Counts")
     plt.title("{0:s} aperture {1:d}".format(filename, order))
@@ -321,8 +327,26 @@ def plotreg(speclist, tresorder, xmark, xwidth, name, legend, a, b, c):
 
      normflux = thisflux[thisww] / med
 
-     thisymin = numpy.min(normflux)
-     thisymax = numpy.max(normflux)
+     # Compute statistics to make mask of emission features in whole order.
+     ss = makesky(thiswave, thisflux, 4)
+     tt = thisflux - ss
+
+     medtt, sigtt = medsig(tt)
+     emmask = tt < medtt + 5.0*sigtt
+
+     # Make sure the present feature is excluded in case
+     # we're dealing with an emission feature.
+     featmask = numpy.logical_and(thiswave >= xcen-1,
+                                  thiswave <= xcen+1)
+
+     emmask[featmask] = 1
+
+     # Extract the relevant part.
+     thisemmask = emmask[thisww]
+
+     # Compute plot range.
+     thisymin = numpy.min(normflux[thisemmask])
+     thisymax = numpy.max(normflux[thisemmask])
 
      if ispec == 0:
        ymin = thisymin

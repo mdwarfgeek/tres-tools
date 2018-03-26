@@ -62,6 +62,12 @@ def do_vrad(pdf, tmplname, filename,
 
   thisflux -= ss
 
+  medflux, sigflux = medsig(thistmpl_flux)
+  tmpl_emmask = thistmpl_flux < medflux + 5.0*sigflux
+
+  medflux, sigflux = medsig(thisflux)
+  emmask = thisflux < medflux + 5.0*sigflux
+
   # Number of measurements (pixels).
   npix = len(thisflux)
 
@@ -78,12 +84,17 @@ def do_vrad(pdf, tmplname, filename,
 
   fig = plt.figure(figsize=figsize)
 
-  yofftarg = max(thistmpl_rawflux)
+  yofftarg = max(thistmpl_rawflux[tmpl_emmask])
 
   plt.subplot(2, 1, 1)
   plt.plot(thistmpl_wave, thistmpl_rawflux)
   plt.plot(thiswave, thisrawflux+yofftarg)
   plt.xlim(thiswave[0], thiswave[-1])
+
+  yl = numpy.min(thistmpl_rawflux[tmpl_emmask])
+  yh = numpy.max(thisrawflux[emmask]) + yofftarg
+  plt.ylim(yl-0.05*(yh-yl), yh+0.05*(yh-yl))
+
   plt.xlabel("Wavelength (A)")
   plt.ylabel("Counts")
   plt.title("Aperture {0:d}".format(order))
