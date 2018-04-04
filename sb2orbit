@@ -502,6 +502,11 @@ if args.m is not None:
 
     line = "{0:<18} {1:12.6f} +/- {2:8.6f} {3}".format(name, med, err, unit)
 
+    if name == "e" and med < 5*err:
+      # Also give upper limit.
+      ul = numpy.percentile(vec, 95.0)
+      line += " (95% CL < {0:.7f})".format(ul)
+
     print >>lfp, line
     print line
 
