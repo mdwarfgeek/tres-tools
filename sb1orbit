@@ -251,6 +251,19 @@ def logpost (trial, x, y, yerr):
 
   return loglike - logprior
 
+def plot_chain(samp, outfile):
+  fig = plt.figure()
+
+  for idim in range(ndim):
+    plt.subplot(ndim, 1, idim+1)
+
+    for iwalk in range(nwalk):
+      plt.plot(samp.chain[iwalk,:,idim])
+
+    plt.ylabel(plist_names[idim])
+
+  fig.savefig(outfile)
+
 ndim = len(plist)
 
 vfinal, verr, chisq, ndof = nlfit(fit_func, parm[plist], fixed, vfit, e_vfit)
@@ -309,25 +322,21 @@ if args.m is not None:
   if nburn < 1000:
     nburn = 1000
 
-  ntot = nsim + nburn
+  pos, prob, state = samp.run_mcmc(pos, nburn,
+                                   rstate0=numpy.random.get_state())
 
-  samp.run_mcmc(pos, ntot, rstate0=numpy.random.get_state())
+  plot_chain(samp, args.m + "_burn.png")
 
-  for idim in range(ndim):
-    plt.subplot(ndim, 1, idim+1)
+  samp.reset()
 
-    for iwalk in range(nwalk):
-      plt.plot(samp.chain[iwalk,:,idim])
+  pos, prob, state = samp.run_mcmc(pos, nsim)
 
-    plt.axvline(nburn)
-    plt.ylabel(plist_names[idim])
-
-  plt.savefig(args.m + "_chains.png")
+  plot_chain(samp, args.m + "_chains.png")
 
   print "Acceptance fraction:", samp.acceptance_fraction
   print "Autocorrelation lengths:", samp.acor
 
-  ch = samp.chain[:,nburn:,:].reshape((-1, ndim))
+  ch = samp.flatchain
 
 #  numpy.savetxt("mcmc.chain.gz", ch)
   numpy.save(args.m, ch, allow_pickle=False)
