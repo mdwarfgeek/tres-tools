@@ -119,6 +119,10 @@ plist_texsym = []
 plist_units = []
 fixed = []
 
+t0_gauss_mean = None
+t0_gauss_sig = None
+p_gauss_mean = None
+p_gauss_sig = None
 m1_gauss_mean = None
 m1_gauss_sig = None
 
@@ -151,6 +155,15 @@ with open(args.pset, "r") as fp:
         parm[iparm] = value - tbase
       else:
         parm[iparm] = value
+
+      # Special cases to impose ephemeris.
+      if sigma is not None:
+        if iparm == eb.PAR_T0:
+          t0_gauss_mean = value - tbase
+          t0_gauss_sig = sigma
+        elif iparm == eb.PAR_P:
+          p_gauss_mean = value
+          p_gauss_sig = sigma
 
       # Primary mass is a special case.
       if iparm == PAR_M1:
@@ -224,6 +237,10 @@ def logpost (trial, x, y, yerr):
   logprior = numpy.log(ourparm[PAR_S] + 0.1*errguess)
 
   # Gaussian on primary mass.
+  if t0_gauss_sig is not None:
+    logprior += 0.5 * ((ourparm[eb.PAR_T0] - t0_gauss_mean) / t0_gauss_sig)**2
+  if p_gauss_sig is not None:
+    logprior += 0.5 * ((ourparm[eb.PAR_P] - p_gauss_mean) / p_gauss_sig)**2
   if m1_gauss_sig is not None:
     logprior += 0.5 * ((ourparm[PAR_M1] - m1_gauss_mean) / m1_gauss_sig)**2
 
@@ -270,6 +287,10 @@ if args.m is not None:
     if fixed[iparm]:
       if jparm == PAR_GAMMA or jparm == PAR_K1:
         pert[iparm] = 1.0
+      elif jparm == eb.PAR_T0 and t0_gauss_sig is not None:  # as prior
+        pert[iparm] = 3.0 * t0_gauss_sig
+      elif jparm == eb.PAR_P and p_gauss_sig is not None:
+        pert[iparm] = 3.0 * p_gauss_sig
       elif jparm == PAR_M1:
         pert[iparm] = 3.0 * m1_gauss_sig
       elif jparm == PAR_S:
