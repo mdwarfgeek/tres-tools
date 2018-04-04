@@ -31,7 +31,9 @@ args = ap.parse_args()
 # Type 42 fonts needed for publication.
 matplotlib.rcParams["pdf.fonttype"] = 42
 matplotlib.rcParams["ps.fonttype"] = 42
-matplotlib.rcParams["font.size"] = 16
+matplotlib.rcParams["figure.subplot.left"] = 0.15
+matplotlib.rcParams["figure.subplot.right"] = 0.85
+matplotlib.rcParams["font.size"] = 14
 
 # Make sure matplotlib doesn't try to use X11 if we're running
 # in non-interactive mode.
@@ -646,7 +648,7 @@ if args.double:
 else:
   plt.ylabel("Residual (km/s)")
 
-plt.tight_layout()
+#plt.tight_layout()
 
 if args.m is None:
   plt.show()
