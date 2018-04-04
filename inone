@@ -611,7 +611,7 @@ if args.o is not None:
   rs.overrideorder = args.o
 
 # Read template.
-tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze, tmpl_vbcv, tmpl_vrad = rs.read_spec(args.template, istmpl=1)
+tmplsp = rs.read_spec(args.template, istmpl=1, wantstruct=True)
 
 tmplname = stripname(args.template)
 
@@ -619,7 +619,7 @@ filelist = args.filelist
 nf = len(args.filelist)
 
 for ifile, filename in enumerate(filelist):
-  mbjd, wave, flux, e_flux, msk, blaze, vbcv, dumvrad = rs.read_spec(filename)
+  sp = rs.read_spec(filename, wantstruct=True)
 
   basefile = stripname(filename)
   outfile = basefile + "_inone.pdf"
@@ -628,32 +628,32 @@ for ifile, filename in enumerate(filelist):
 
   # Velocity.
   vrad, hbest, vsinibest = do_vrad(pdf, tmplname, filename,
-                                   tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_vbcv, tmpl_vrad,
-                                   mbjd, wave, flux, e_flux, msk, vbcv,
+                                   tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk, tmplsp.vbcv, tmplsp.vrad,
+                                   sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk, sp.vbcv,
                                    order=rs.singleorder, dovsini=0, savefile=args.f)
 
   # LSD.
   do_lsd(pdf, filename,
-         tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_vbcv, tmpl_vrad,
-         mbjd, wave, flux, e_flux, msk, vbcv,
+         tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk, tmplsp.vbcv, tmplsp.vrad,
+         sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk, sp.vbcv,
          vrad,
          orders=rs.multiorder, savefile=args.f)
 
   if args.r is None:
     vrad, hbest, vsinibest = do_vrad(pdf, tmplname, filename,
-                                     tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_vbcv, tmpl_vrad,
-                                     mbjd, wave, flux, e_flux, msk, vbcv,
+                                     tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk, tmplsp.vbcv, tmplsp.vrad,
+                                     sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk, sp.vbcv,
                                      order=rs.singleorder, dovsini=1, savefile=args.f)
   elif args.r > 0:
     vrad, hbest, vsinibest = do_vrad(pdf, tmplname, filename,
-                                     tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_vbcv, tmpl_vrad,
-                                     mbjd, wave, flux, e_flux, msk, vbcv,
+                                     tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk, tmplsp.vbcv, tmplsp.vrad,
+                                     sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk, sp.vbcv,
                                      order=rs.singleorder, dovsini=0, vsini=args.r, savefile=args.f)
 
-  if blaze is not None:
+  if sp.blaze is not None:
     # Equivalent width.
-    ewha, e_ewha, ewcai, e_ewcai = do_ews(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze,
-                                          wave, flux, e_flux, msk, blaze,
+    ewha, e_ewha, ewcai, e_ewcai = do_ews(tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk, tmplsp.blaze,
+                                          sp.wave, sp.flux, sp.e_flux, sp.msk, sp.blaze,
                                           vrad)
   else:
     ewha = None
@@ -663,15 +663,15 @@ for ifile, filename in enumerate(filelist):
 
   # Plot features.
   do_plotfeatures(pdf, filename,
-                  mbjd, wave, flux, e_flux, msk,
+                  sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
                   vrad, ewha, e_ewha, ewcai, e_ewcai)
 
   pdf.close()
 
   if ewha is not None:
-    print "{0:s} {1:.4f} {2:.3f} {3:.3f} {4:.2f} {5:.4f} {6:.4f} {7:.4f} {8:.4f}".format(filename, lfa.ZMJD+mbjd, vrad, hbest, vsinibest, ewha, e_ewha, ewcai, e_ewcai)
+    print "{0:s} {1:12.4f} {2:8.3f} {3:9.6f} {4:7.2f} {5:5.2f} {6:8.4f} {7:6.4f} {8:6.4f} {9:6.4f}".format(filename, lfa.ZMJD+sp.mbjd, vrad, hbest, sp.exptime, vsinibest, ewha, e_ewha, ewcai, e_ewcai)
   else:
-    print "{0:s} {1:.4f} {2:.3f} {3:.3f} {4:.2f}".format(filename, lfa.ZMJD+mbjd, vrad, hbest, vsinibest)
+    print "{0:s} {1:12.4f} {2:8.3f} {3:9.6f} {4:7.2f} {5:5.2f}".format(filename, lfa.ZMJD+sp.mbjd, vrad, hbest, sp.exptime, vsinibest)
 
 sys.exit(0)
 

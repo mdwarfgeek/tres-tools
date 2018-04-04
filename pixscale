@@ -21,9 +21,9 @@ if args.o is not None:
   rs.overrideorder = args.o
 
 # Read template.
-tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze, tmpl_vbcv, tmpl_vrad = rs.read_spec(args.template)
+tmplsp = rs.read_spec(args.template, wantstruct=True)
 
-thistmpl_wave, thistmpl_flux, thistmpl_e_flux = prepord(rs.singleorder, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk)
+thistmpl_wave, thistmpl_flux, thistmpl_e_flux = prepord(rs.singleorder, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk)
 
 npix = len(thistmpl_wave)
 

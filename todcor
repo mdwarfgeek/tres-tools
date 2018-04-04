@@ -187,12 +187,12 @@ def do_optimize(filelist, targlist, optlist, init_parm):
     trial_parm[optlist] = p
 
     for ifile, filename in enumerate(filelist):
-      mbjd, wave, flux, e_flux, msk, blaze, vbcv, dumvrad = targlist[ifile]
+      sp = targlist[ifile]
 
       xbest, ybest, hbest = do_todcor(None, tmplaname, tmplbname, filename,
-                                      tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
-                                      tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
-                                      mbjd, wave, flux, e_flux, msk, vbcv,
+                                      tmplasp.mbjd, tmplasp.wave, tmplasp.flux, tmplasp.e_flux, tmplasp.msk, tmplasp.vbcv, tmplasp.vrad,
+                                      tmplbsp.mbjd, tmplbsp.wave, tmplbsp.flux, tmplbsp.e_flux, tmplbsp.msk, tmplbsp.vbcv, tmplbsp.vrad,
+                                      sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk, sp.vbcv,
                                       trial_parm[PAR_VSINIA],
                                       trial_parm[PAR_VSINIB],
                                       trial_parm[PAR_ALPHA],
@@ -222,7 +222,7 @@ def do_fixed(filelist, targlist, parm, dopdf=False):
   ssqh = 0
 
   for ifile, filename in enumerate(filelist):
-    mbjd, wave, flux, e_flux, msk, blaze, vbcv, dumvrad = targlist[ifile]
+    sp = targlist[ifile]
     
     if dopdf:
       basefile = stripname(filename)
@@ -234,9 +234,9 @@ def do_fixed(filelist, targlist, parm, dopdf=False):
 
     # Velocities.
     xbest, ybest, hbest = do_todcor(pdf, tmplaname, tmplbname, filename,
-                                    tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
-                                    tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
-                                    mbjd, wave, flux, e_flux, msk, vbcv,
+                                    tmplasp.mbjd, tmplasp.wave, tmplasp.flux, tmplasp.e_flux, tmplasp.msk, tmplasp.vbcv, tmplasp.vrad,
+                                    tmplbsp.mbjd, tmplbsp.wave, tmplbsp.flux, tmplbsp.e_flux, tmplbsp.msk, tmplbsp.vbcv, tmplbsp.vrad,
+                                    sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk, sp.vbcv,
                                     parm[PAR_VSINIA],
                                     parm[PAR_VSINIB],
                                     parm[PAR_ALPHA],
@@ -245,7 +245,7 @@ def do_fixed(filelist, targlist, parm, dopdf=False):
     if pdf is not None:
       pdf.close()
     
-    print "{0:12.4f} {1:8.3f} {2:8.3f} {3:9.6f}".format(lfa.ZMJD+mbjd, xbest, ybest, hbest)
+    print "{0:12.4f} {1:8.3f} {2:8.3f} {3:9.6f} {4:7.2f}".format(lfa.ZMJD+sp.mbjd, xbest, ybest, hbest, sp.exptime)
 
     ssqh += hbest*hbest
 
@@ -279,8 +279,8 @@ if args.o is not None:
   rs.overrideorder = args.o
 
 # Read templates.
-tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_blaze, tmpla_vbcv, tmpla_vrad = rs.read_spec(args.tmpla, istmpl=1)
-tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_blaze, tmplb_vbcv, tmplb_vrad = rs.read_spec(args.tmplb, istmpl=1)
+tmplasp = rs.read_spec(args.tmpla, istmpl=1, wantstruct=True)
+tmplbsp = rs.read_spec(args.tmplb, istmpl=1, wantstruct=True)
 
 parm = numpy.empty([NPARM], dtype=numpy.double)
 
@@ -296,7 +296,7 @@ nf = len(args.filelist)
 # Read targets.
 targlist = [None] * nf
 for ifile, filename in enumerate(filelist):
-  targlist[ifile] = rs.read_spec(filename)
+  targlist[ifile] = rs.read_spec(filename, wantstruct=True)
 
 minvela, maxvela = args.alim
 minvelb, maxvelb = args.blim

@@ -21,6 +21,13 @@ def stripname(filespec):
 
   return basefile
 
+# Class to store the spectrum.  This is actually just a generic
+# "structure" initialized from the given contents.
+class spec:
+  def __init__(self, **entries):
+    self.__dict__.update(entries)
+
+# Class to read spectra.
 class read_spec:
   def __init__(self):
     self.obs = None
@@ -30,7 +37,7 @@ class read_spec:
     self.multiorder = None
     self.overrideorder = None
 
-  def read_spec(self, filespec, istmpl=False):
+  def read_spec(self, filespec, istmpl=False, wantstruct=False):
     # Convert file specification from script argument into a file list.
     # The string "filespec" can be a single item or comma-separated
     # list of items.  Each item can be a filename or @list to read an
@@ -202,5 +209,20 @@ class read_spec:
     # Keep track of how much adjustment was applied.
     vbcv = (lfa.LIGHT * zb / 1000)
 
-    return mbjd, wave, flux, e_flux, msk, blaze, vbcv, vrad
+    # Result.
+    if wantstruct:
+      sp = spec(mbjd=mbjd,
+                wave=wave,
+                flux=flux,
+                e_flux=e_flux,
+                msk=msk,
+                blaze=blaze,
+                vbcv=vbcv,
+                vrad=vrad,
+                exptime=exptime,
+                istmpl=istmpl)
+
+      return sp
+    else:
+      return mbjd, wave, flux, e_flux, msk, blaze, vbcv, vrad
 

@@ -19,9 +19,9 @@ if args.o is not None:
   rs.overrideorder = args.o
 
 for filename in args.filelist:
-  mbjd, wave, flux, e_flux, msk, blaze, vbcv, vrad = rs.read_spec(filename)
+  sp = rs.read_spec(filename, wantstruct=True)
 
-  thiswave, thisflux, thise_flux = prepord(rs.singleorder, wave, flux, e_flux, msk)
+  thiswave, thisflux, thise_flux = prepord(rs.singleorder, sp.wave, sp.flux, sp.e_flux, sp.msk)
 
   npix = len(thiswave)
   

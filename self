@@ -276,7 +276,7 @@ if args.o is not None:
   rs.overrideorder = args.o
 
 # Read epoch to use as template.
-tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze, tmpl_vbcv, tmpl_vrad = rs.read_spec(args.template)
+tmplsp = rs.read_spec(args.template, wantstruct=True)
 
 tmplname = re.sub(r'_cb\.spec$', "", stripname(args.template))
 
@@ -284,7 +284,7 @@ filelist = args.filelist
 nf = len(args.filelist)
 
 for ifile, filename in enumerate(filelist):
-  mbjd, wave, flux, e_flux, msk, blaze, vbcv, dumvrad = rs.read_spec(filename)
+  sp = rs.read_spec(filename, wantstruct=True)
 
   targname = re.sub(r'_cb\.spec$', "", stripname(filename))
 
@@ -295,24 +295,24 @@ for ifile, filename in enumerate(filelist):
 
   # Velocity.
   vrad, hbest = do_vrad(pdf, tmplname, targname,
-                        tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
-                        mbjd, wave, flux, e_flux, msk,
+                        tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
+                        sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
                         order=rs.singleorder)
 
   do_lsd(pdf, filename,
-         tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
-         mbjd, wave, flux, e_flux, msk,
+         tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
+         sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
          vrad,
          orders=rs.multiorder)
 
   mean_vrad, e_mean_vrad = do_multi_vrad(pdf, tmplname, targname,
-                                         tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
-                                         mbjd, wave, flux, e_flux, msk,
+                                         tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
+                                         sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
                                          orders=rs.multiorder)
 
   pdf.close()
 
-  print "{0:s} {1:.4f} {2:.3f} {3:.3f}".format(filename, lfa.ZMJD+mbjd, mean_vrad, e_mean_vrad, hbest)
+  print "{0:s} {1:12.4f} {2:8.3f} {3:6.3f} {4:7.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vrad, e_mean_vrad, sp.exptime)
 
 sys.exit(0)
 
