@@ -20,10 +20,12 @@ ap = argparse.ArgumentParser()
 ap.add_argument("pset", help="parameter file")
 ap.add_argument("vels", help="velocities")
 ap.add_argument("-3", action="store_true", dest="triple", help="read and plot third star from TRICOR file")
+ap.add_argument("-b", type=int, help="set number of burn-in samples")
 ap.add_argument("-m", help="run MCMC storing output to file M")
 ap.add_argument("-n", type=int, help="set number of MCMC samples to N")
 ap.add_argument("-s", action="store_true", help="fit separate sigmas for each star")
 ap.add_argument("-u", action="store_true", help="plot unfolded phase")
+ap.add_argument("-w", type=int, help="set number of walkers")
 args = ap.parse_args()
 
 # Type 42 fonts needed for publication.
@@ -299,7 +301,10 @@ print 'chi squared =', chisq, 'ndof =', ndof
 
 if args.m is not None:
   # Init MC
-  nwalk = 100
+  if args.w is not None:
+    nwalk = args.w
+  else:
+    nwalk = 100
 
   samp = emcee.EnsembleSampler(nwalk, ndim, logpost, args=(bjdfit, vfit, e_vfit))
 
@@ -325,9 +330,15 @@ if args.m is not None:
   else:
     nsim = 50000
 
-  nburn = nsim // 5
-  if nburn < 1000:
-    nburn = 1000
+  if args.b is not None:
+    nburn = args.b
+  else:
+    nburn = nsim // 5
+    if nburn < 1000:
+      nburn = 1000
+
+  print "MCMC using", nwalk, "walkers nburn =", nburn, "nsim =", nsim
+  print "Will produce", nburn*nwalk, "burn-in and", nsim*nwalk, "final samples"
 
   pos, prob, state = samp.run_mcmc(pos, nburn,
                                    rstate0=numpy.random.get_state())
