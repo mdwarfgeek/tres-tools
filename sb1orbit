@@ -22,6 +22,7 @@ ap.add_argument("pset", help="parameter file")
 ap.add_argument("vels", help="velocities")
 ap.add_argument("-2", action="store_true", dest="double", help="read and plot second star from TODCOR file")
 ap.add_argument("-b", type=int, help="set number of burn-in samples")
+ap.add_argument("-e", action="store_true", help="input file has errors in 3rd column")
 ap.add_argument("-m", help="run MCMC storing output to file M")
 ap.add_argument("-n", type=int, help="set number of MCMC samples to N")
 ap.add_argument("-u", action="store_true", help="plot unfolded phase")
@@ -112,7 +113,11 @@ tbase = math.floor(vels["bjd"][0])
 
 bjd = vels["bjd"] - tbase
 v1 = vels["v1"]
-hh = vels["h"]
+
+if args.e:
+  e_v1 = vels["h"]
+else:
+  hh = vels["h"]
 
 nobs = len(bjd)
 
@@ -197,12 +202,20 @@ plist = numpy.array(plist, dtype=numpy.int)
 fixed = numpy.array(fixed, dtype=numpy.bool)
 
 # Store this for later.
-errguess = parm[PAR_S]
+if args.e:
+  errguess = numpy.median(e_v1)
+  print "Using errguess =", errguess, "modified Jeffreys soften", 0.1*errguess
+else:
+  errguess = parm[PAR_S]
 
 # Format arrays for fitting.
 bjdfit = bjd
 vfit = v1
-e_vfit = errguess / hh
+
+if args.e:
+  e_vfit = numpy.hypot(parm[PAR_S], e_v1)
+else:
+  e_vfit = parm[PAR_S] / hh
 
 typ = numpy.empty_like(vfit, dtype=numpy.uint8)
 typ[:] = eb.OBS_VRAD1
@@ -224,16 +237,25 @@ def logpost (trial, x, y, yerr):
 
   # Check ranges.
   ecc = math.hypot(ourparm[eb.PAR_ECOSW], ourparm[eb.PAR_ESINW])
-
-  if ourparm[PAR_S] <= 0 or ecc >= 1.0:
+  if ecc >= 1.0:
     return -numpy.inf
+
+  if args.e:
+    if ourparm[PAR_S] < 0:
+      return -numpy.inf
+  else:
+    if ourparm[PAR_S] <= 0:
+      return -numpy.inf
 
   # Likelihood.
   ymod = eb.model(ourparm, x, typ, 0)
   ymod *= ourparm[PAR_K1]
   ymod += ourparm[PAR_GAMMA]
   
-  wt = (hh / ourparm[PAR_S])**2
+  if args.e:
+    wt = 1.0 / (ourparm[PAR_S]**2 + e_v1**2)
+  else:
+    wt = (hh / ourparm[PAR_S])**2
 
   loglike = -0.5*(numpy.sum(wt*(y-ymod)**2 - numpy.log(wt)))
 
@@ -560,7 +582,8 @@ if args.m is not None:
 
   ndof = vfit.size - vmed.size
 
-  print "Median rms =", numpy.median(parm[PAR_S]/hh), "km/s"
+  if not args.e:
+    print "Median rms =", numpy.median(parm[PAR_S]/hh), "km/s"
 
 # Phases of observations.
 tmp = (bjdfit - parm[eb.PAR_T0]) / parm[eb.PAR_P]
@@ -587,7 +610,10 @@ else:
 phiplot = numpy.linspace(phimin, phimax, 1000)
 typplot = numpy.empty_like(phiplot, dtype=numpy.uint8)
 
-e_vfit = parm[PAR_S] / hh
+if args.e:
+  e_vfit = numpy.hypot(parm[PAR_S], e_v1)
+else:
+  e_vfit = parm[PAR_S] / hh
 
 typplot.fill(eb.OBS_VRAD1)
 yplot1 = eb.model(parm, phiplot, typplot, eb.FLAG_PHI)
@@ -600,7 +626,10 @@ plt.plot(phiplot, yplot1, color="blue")
 if args.double:
   mean2 = numpy.mean(v2)
   resid2 = v2 - mean2
-  err2 = parm[PAR_S] / hh
+  if args.e:
+    err2 = numpy.hypot(parm[PAR_S], e_v1)  # consistent but probably no!
+  else:
+    err2 = parm[PAR_S] / hh
 
   print "gamma2 =", mean2, "km/s"
 
