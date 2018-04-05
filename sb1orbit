@@ -25,6 +25,7 @@ ap.add_argument("-b", type=int, help="set number of burn-in samples")
 ap.add_argument("-e", action="store_true", help="input file has errors in 3rd column")
 ap.add_argument("-m", help="run MCMC storing output to file M")
 ap.add_argument("-n", type=int, help="set number of MCMC samples to N")
+ap.add_argument("-t", action="store_true", help="integrate model over exposure time")
 ap.add_argument("-u", action="store_true", help="plot unfolded phase")
 ap.add_argument("-w", type=int, help="set number of walkers")
 args = ap.parse_args()
@@ -87,24 +88,40 @@ parm[eb.PAR_RR]    =   0.001  # dummy value
 # Supply a default for error scaling parameter.
 parm[PAR_S]        =   0.05   # km/s
 
+# Sampling to use for integration over exposure time.  Needs to be odd.
+NSAMP = 29
+
 # Load data.  Allows both possible forms (with or without filename).
 if args.double:
+  names = [ "bjd", "v1", "v2", "h" ]
+  if args.t:
+    names.append("texp")
+  dtypes = [ "f8" ] * len(names)
+
   vels = numpy.genfromtxt(args.vels,
-                          dtype={"names": ("bjd", "v1", "v2", "h"),
-                                 "formats": ("f8", "f8", "f8", "f8") },
+                          dtype={"names": names,
+                                 "formats": dtypes },
                           loose=False)
 
   v2 = vels["v2"]
 else:
+  names = [ "bjd", "v1", "h" ]
+  if args.t:
+    names.append("texp")
+  dtypes = [ "f8" ] * len(names)
+
   try:
     vels = numpy.genfromtxt(args.vels,
-                            dtype={"names": ("bjd", "v1", "h"),
-                                   "formats": ("f8", "f8", "f8") },
+                            dtype={"names": names,
+                                   "formats": dtypes },
                             loose=False)
   except:
+    names.insert(0, "filename")
+    dtypes.insert(0, "a")
+
     vels = numpy.genfromtxt(args.vels,
-                            dtype={"names": ("filename", "bjd", "v1", "h"),
-                                   "formats": ("a", "f8", "f8", "f8") },
+                            dtype={"names": names,
+                                   "formats": dtypes },
                             loose=False)
 
   v2 = None
@@ -118,6 +135,9 @@ if args.e:
   e_v1 = vels["h"]
 else:
   hh = vels["h"]
+
+if args.t:
+  texp = vels["texp"]
 
 nobs = len(bjd)
 
@@ -220,12 +240,35 @@ else:
 typ = numpy.empty_like(vfit, dtype=numpy.uint8)
 typ[:] = eb.OBS_VRAD1
 
+if args.t:
+  # Sampling points.
+  isamp = numpy.arange(NSAMP)
+  dtwin = 1.0 / 86400.0
+  dt1 = -0.5 * dtwin
+  dtsamp = dtwin / NSAMP
+  dt = dt1 + dtsamp * (isamp + 0.5)
+
+  # Matrix of deltas.
+  alldt = numpy.outer(dt, texp)
+
+  # Matrix of timestamps to evaluate model at, using broadcasting.
+  bjdtmp = bjd + alldt
+
+  # The corresponding matrix of "typ" values.
+  typtmp = numpy.empty_like(bjdtmp, dtype=numpy.uint8)
+  typtmp[:] = eb.OBS_VRAD1
+
 # L-M objective function.
 def fit_func (trial, ymod):
   ourparm = numpy.copy(parm)
   ourparm[plist] = trial
 
-  eb.model(ourparm, bjdfit, typ, 0, out=ymod)
+  if args.t:
+    ytmp = eb.model(ourparm, bjdtmp, typtmp, 0)
+    ymod[:] = numpy.mean(ytmp, axis=0)
+  else:
+    eb.model(ourparm, bjdfit, typ, 0, out=ymod)
+
   ymod *= ourparm[PAR_K1]
   ymod += ourparm[PAR_GAMMA]
 
@@ -248,7 +291,12 @@ def logpost (trial, x, y, yerr):
       return -numpy.inf
 
   # Likelihood.
-  ymod = eb.model(ourparm, x, typ, 0)
+  if args.t:
+    ytmp = eb.model(ourparm, bjdtmp, typtmp, 0)
+    ymod = numpy.mean(ytmp, axis=0)
+  else:
+    ymod = eb.model(ourparm, x, typ, 0)
+
   ymod *= ourparm[PAR_K1]
   ymod += ourparm[PAR_GAMMA]
   
