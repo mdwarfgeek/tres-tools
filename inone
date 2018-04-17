@@ -137,7 +137,7 @@ def do_vrad(pdf, tmplname, filename,
   
       with open(rotfile, "w") as rfp:
         for imeas, thisvsini in enumerate(l_vsini):
-          print >>rfp, thisvsini, l_p[imeas]
+          rfp.write(str(thisvsini) + " " + str(l_p[imeas]) + "\n")
   
     ccffile = basefile
     if dovsini:
@@ -147,7 +147,7 @@ def do_vrad(pdf, tmplname, filename,
 
     with open(ccffile, "w") as cfp:
       for imeas, thisvel in enumerate(vels):
-        print >>cfp, thisvel, corr[imeas]
+        cfp.write(str(thisvel) + " " + str(corr[imeas]) + "\n")
 
   # Plot.
   fig = plt.figure(figsize=figsize)
@@ -240,7 +240,7 @@ def do_lsd(pdf, filename,
 
     with open(lsdfile, "w") as lfp:
       for imeas, thisvel in enumerate(vels):
-        print >>lfp, thisvel, prof[imeas]
+        lfp.write(str(thisvel) + " " + str(prof[imeas]) + "\n")
 
   # Plot.
   fig = plt.figure(figsize=figsize)
@@ -669,9 +669,9 @@ for ifile, filename in enumerate(filelist):
   pdf.close()
 
   if ewha is not None:
-    print "{0:s} {1:12.4f} {2:8.3f} {3:9.6f} {4:7.2f} {5:5.2f} {6:8.4f} {7:6.4f} {8:7.4f} {9:6.4f}".format(filename, lfa.ZMJD+sp.mbjd, vrad, hbest, sp.exptime, vsinibest, ewha, e_ewha, ewcai, e_ewcai)
+    print("{0:s} {1:12.4f} {2:8.3f} {3:9.6f} {4:7.2f} {5:5.2f} {6:8.4f} {7:6.4f} {8:7.4f} {9:6.4f}".format(filename, lfa.ZMJD+sp.mbjd, vrad, hbest, sp.exptime, vsinibest, ewha, e_ewha, ewcai, e_ewcai))
   else:
-    print "{0:s} {1:12.4f} {2:8.3f} {3:9.6f} {4:7.2f} {5:5.2f}".format(filename, lfa.ZMJD+sp.mbjd, vrad, hbest, sp.exptime, vsinibest)
+    print("{0:s} {1:12.4f} {2:8.3f} {3:9.6f} {4:7.2f} {5:5.2f}".format(filename, lfa.ZMJD+sp.mbjd, vrad, hbest, sp.exptime, vsinibest))
 
 sys.exit(0)
 

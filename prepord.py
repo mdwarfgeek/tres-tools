@@ -1,5 +1,4 @@
 import numpy
-import sys
 
 def prepord(order, wave, flux, e_flux, msk=None, trim=1):
   iord = order-1
@@ -25,8 +24,7 @@ def prepord(order, wave, flux, e_flux, msk=None, trim=1):
       istart += 1
     
     if istart >= n:
-      print >>sys.stderr, "Order", order, "is entirely masked out"
-      sys.exit(1)
+      raise RuntimeError("order {0:d} is entirely masked out".format(order))
   
     iend = n-1
     while iend >= 0 and not thismsk[iend]:
@@ -34,9 +32,7 @@ def prepord(order, wave, flux, e_flux, msk=None, trim=1):
 
     if iend >= istart:
       if not numpy.all(thismsk[istart:iend+1]):
-        print >>sys.stderr, "Mask is not contiguous in order", order
-        print >>sys.stderr, istart, iend, n
-        sys.exit(1)
+        raise RuntimeError("mask is not contiguous in order {0:d}: {1:d} {2:d} {3:d}".format(order, istart, iend, n))
 
     # Apply mask.
     thiswave = thiswave[thismsk]

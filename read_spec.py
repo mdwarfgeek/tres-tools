@@ -1,7 +1,6 @@
 import numpy
 import os
 import string
-import sys
 
 import fitsio
 import lfa
@@ -89,14 +88,11 @@ class read_spec:
         specname = "feros"
 
     if specname is None:
-      print >>sys.stderr, "Unrecognised instrument"
-      sys.exit(1)
+      raise RuntimeError("unrecognised instrument")
 
     if self.specname is None:
       # Import that instrument's library.
       m = __import__(specname)
-
-#      print >>sys.stderr, "instrument =", specname
 
       self.specname = specname
 
@@ -118,15 +114,11 @@ class read_spec:
         self.singleorder = self.overrideorder
 
     elif specname != self.specname:
-      print >>sys.stderr, "Files seem to be from different instruments"
-      print >>sys.stderr, "Previous file was", self.specname
-      print >>sys.stderr, "Current file", filename, "is", specname
-      sys.exit(1)
+      raise RuntimeError("files seem to be from different instruments: previous {0:s} current file {2:s} instrument {3:s}".format(self.specname, filename, specname))
 
     if istmpl:
       if not "VELOCITY" in hdr:
-        print >>sys.stderr, "ERROR: please set velocity for template"
-        sys.exit(1)
+        raise RuntimeError("please set velocity for template")
         
       vrad = float(hdr["VELOCITY"])
     else:
