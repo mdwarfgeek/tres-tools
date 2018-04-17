@@ -620,9 +620,6 @@ if args.m is not None:
 
     print >>tfp, texline
 
-  lfp.close()
-  tfp.close()
-
   # Update parameters.
   parm[plist] = vmed
   vfinal = vmed
@@ -631,7 +628,11 @@ if args.m is not None:
   ndof = vfit.size - vmed.size
 
   if not args.e:
+    print >>lfp, "Median rms =", numpy.median(parm[PAR_S]/hh), "km/s"
     print "Median rms =", numpy.median(parm[PAR_S]/hh), "km/s"
+
+  lfp.close()
+  tfp.close()
 
 # Phases of observations.
 tmp = (bjdfit - parm[eb.PAR_T0]) / parm[eb.PAR_P]
