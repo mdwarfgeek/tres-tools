@@ -424,6 +424,14 @@ if args.m is not None:
 #  numpy.savetxt("mcmc.chain.gz", ch)
   numpy.save(args.m, ch, allow_pickle=False)
 
+  # Corner plot if module available.
+  try:
+    import corner
+    fig = corner.corner(ch, labels=plist_names)
+    fig.savefig(args.m + "_corner.pdf")
+  except:
+    pass
+
   lfp = open(args.m + "_orbit.txt", "w")
   tfp = open(args.m + "_orbit.tex", "w")
 
