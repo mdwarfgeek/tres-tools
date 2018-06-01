@@ -170,7 +170,7 @@ def do_lsd(pdf, filename,
 
     with open(lsdfile, "w") as lfp:
       for imeas, thisvel in enumerate(vels):
-        print >>lfp, thisvel, prof[imeas]
+        lfp.write(str(thisvel) + " " + str(prof[imeas]) + "\n")
 
   # Plot.
   fig = plt.figure(figsize=figsize)

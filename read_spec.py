@@ -50,7 +50,7 @@ class read_spec:
         listfile = thisspec[1:]
         
         with open(listfile) as fp:
-          filelist.extend(map(string.strip, fp))
+          filelist.extend(list(map(string.strip, fp)))
       else:
         filelist.append(thisspec)
 
