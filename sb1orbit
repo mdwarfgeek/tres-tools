@@ -429,6 +429,7 @@ if args.m is not None:
     import corner
     fig = corner.corner(ch, labels=plist_names)
     fig.savefig(args.m + "_corner.pdf")
+    plt.close()  # needed to reset state
   except:
     pass
 
