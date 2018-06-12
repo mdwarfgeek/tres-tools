@@ -92,7 +92,8 @@ def do_tricor(pdf, tmplaname, tmplbname, tmplcname, filename,
   frv = fftrv.fftrv(nbin=nbin,
                     top_nrun=filtl,
                     nrun=filth,
-                    pkfit=0)
+                    pkfit=0,
+                    t_emchop=emchop, s_emchop=emchop)
 
   tc = tricor.tricor(frv,
                      thistmpla_wave, thistmpla_flux,
@@ -225,6 +226,7 @@ ap.add_argument("--alim", type=get_range, default=[-velrange, velrange], help="s
 ap.add_argument("--blim", type=get_range, default=[-velrange, velrange], help="set velocity range star 2 --blim='min:max', default {0:d} to {1:d}".format(-velrange, velrange))
 ap.add_argument("--clim", type=get_range, default=[-velrange, velrange], help="set velocity range star 3 --clim='min:max', default {0:d} to {1:d}".format(-velrange, velrange))
 ap.add_argument("-a", help="automatically optimize parameters par1,par2,...")
+ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-p", action='store_true', help="save plots of 3-D correlation function")
 args = ap.parse_args()
@@ -234,6 +236,8 @@ rs = read_spec()
 
 if args.o is not None:
   rs.overrideorder = args.o
+
+emchop = not args.E
 
 # Read templates.
 tmplasp = rs.read_spec(args.tmpla, istmpl=1, wantstruct=True)

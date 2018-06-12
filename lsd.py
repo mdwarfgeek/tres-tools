@@ -12,7 +12,7 @@ def lsd_multiorder(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
                    wave, flux, e_flux, msk,
                    orders,
                    vl, vh, nv,
-                   kreg):
+                   kreg, emchop=True):
   zl = vl * 1000.0 / lfa.LIGHT
   zh = vh * 1000.0 / lfa.LIGHT
 
@@ -38,20 +38,21 @@ def lsd_multiorder(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
     thisflux /= ss
     thise_flux /= ss
 
-    # Clip emission lines.
-    medflux, sigflux = medsig(thistmpl_flux)
-    ww = thistmpl_flux < medflux + 5*sigflux
+    if emchop:
+      # Clip emission lines.
+      medflux, sigflux = medsig(thistmpl_flux)
+      ww = thistmpl_flux < medflux + 5*sigflux
 
-    thistmpl_wave = thistmpl_wave[ww]
-    thistmpl_flux = thistmpl_flux[ww]
-    thistmpl_e_flux = thistmpl_e_flux[ww]
+      thistmpl_wave = thistmpl_wave[ww]
+      thistmpl_flux = thistmpl_flux[ww]
+      thistmpl_e_flux = thistmpl_e_flux[ww]
 
-    medflux, sigflux = medsig(thisflux)
-    ww = thisflux < medflux + 5*sigflux
-
-    thiswave = thiswave[ww]
-    thisflux = thisflux[ww]
-    thise_flux = thise_flux[ww]
+      medflux, sigflux = medsig(thisflux)
+      ww = thisflux < medflux + 5*sigflux
+      
+      thiswave = thiswave[ww]
+      thisflux = thisflux[ww]
+      thise_flux = thise_flux[ww]
 
     # Figure out which pixels in are always in range.
     wanttmpl = thiswave - zl*thiswave

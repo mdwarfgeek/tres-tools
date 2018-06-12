@@ -43,7 +43,7 @@ kreg = 100
 
 def do_vrad(pdf, tmplname, filename,
             tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
-            mbjd, wave, flux, e_flux, msk, order):
+            mbjd, wave, flux, e_flux, msk, order, emchop=True):
 
   # Extract order and clean.
   thistmpl_wave, thistmpl_flux, thistmpl_e_flux = prepord(order, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk)
@@ -62,17 +62,21 @@ def do_vrad(pdf, tmplname, filename,
 
   thisflux -= ss
 
-  medflux, sigflux = medsig(thistmpl_flux)
-  tmpl_emmask = thistmpl_flux < medflux + 5.0*sigflux
-
-  medflux, sigflux = medsig(thisflux)
-  emmask = thisflux < medflux + 5.0*sigflux
+  if emchop:
+    medflux, sigflux = medsig(thistmpl_flux)
+    tmpl_emmask = thistmpl_flux < medflux + 5.0*sigflux
+    
+    medflux, sigflux = medsig(thisflux)
+    emmask = thisflux < medflux + 5.0*sigflux
+  else:
+    tmpl_emmask = numpy.ones_like(thistmpl_flux, dtype=numpy.bool)
+    emmask = numpy.ones_like(thisflux, dtype=numpy.bool)
 
   # Number of measurements (pixels).
   npix = len(thisflux)
 
   # Correlate.
-  frv = fftrv.fftrv(nbin=32*npix)
+  frv = fftrv.fftrv(nbin=32*npix, t_emchop=emchop, s_emchop=emchop)
 
   z, corr, zbest, hbest, sigt = frv.correlate(thistmpl_wave, thistmpl_flux,
                                               thiswave, thisflux)
@@ -151,7 +155,7 @@ def do_vrad(pdf, tmplname, filename,
 def do_lsd(pdf, filename,
            tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
            mbjd, wave, flux, e_flux, msk,
-           vrad, orders, savefile=False):
+           vrad, orders, savefile=False, emchop=True):
   # Compute at 0.5 km/s intervals.
   vl = vrad-velrange
   vh = vrad+velrange
@@ -161,7 +165,7 @@ def do_lsd(pdf, filename,
                               wave, flux, e_flux, msk,
                               orders,
                               vl, vh, nv,
-                              kreg)
+                              kreg, emchop=emchop)
 
   # Optionally save LSD to file.
   if savefile:
@@ -189,7 +193,7 @@ def do_lsd(pdf, filename,
 def do_multi_vrad(pdf, tmplname, filename,
                   tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
                   mbjd, wave, flux, e_flux, msk,
-                  orders):
+                  orders, emchop=True):
   l_vrad = numpy.empty_like(orders, dtype=numpy.double)
   l_corr = numpy.empty_like(orders, dtype=numpy.double)
 
@@ -211,7 +215,7 @@ def do_multi_vrad(pdf, tmplname, filename,
     npix = len(thisflux)
 
     # Correlate.
-    frv = fftrv.fftrv(nbin=32*npix)
+    frv = fftrv.fftrv(nbin=32*npix, t_emchop=emchop, s_emchop=emchop)
 
     z, corr, zbest, hbest, sigt = frv.correlate(thistmpl_wave, thistmpl_flux,
                                                 thiswave, thisflux)
@@ -225,7 +229,10 @@ def do_multi_vrad(pdf, tmplname, filename,
   mean_vrad = numpy.mean(l_vrad)
   sig_vrad = numpy.std(l_vrad)
 
-  e_mean_vrad = sig_vrad / math.sqrt(len(l_vrad)-1)
+  if len(l_vrad) > 1:
+    e_mean_vrad = sig_vrad / math.sqrt(len(l_vrad)-1)
+  else:
+    e_mean_vrad = 0
 
   fig = plt.figure(figsize=figsize)
 
@@ -266,6 +273,7 @@ def do_multi_vrad(pdf, tmplname, filename,
 ap = argparse.ArgumentParser()
 ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
 ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
+ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 args = ap.parse_args()
 
@@ -274,6 +282,8 @@ rs = read_spec()
 
 if args.o is not None:
   rs.overrideorder = args.o
+
+emchop = not args.E
 
 # Read epoch to use as template.
 tmplsp = rs.read_spec(args.template, wantstruct=True)
@@ -297,18 +307,22 @@ for ifile, filename in enumerate(filelist):
   vrad, hbest = do_vrad(pdf, tmplname, targname,
                         tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
                         sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
-                        order=rs.singleorder)
+                        order=rs.singleorder, emchop=emchop)
+
+  multiorders = rs.multiorder
+  if args.o is not None:
+    multiorders = [ args.o ]
 
   do_lsd(pdf, filename,
          tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
          sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
          vrad,
-         orders=rs.multiorder)
+         orders=multiorders, emchop=emchop)
 
   mean_vrad, e_mean_vrad = do_multi_vrad(pdf, tmplname, targname,
                                          tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
                                          sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
-                                         orders=rs.multiorder)
+                                         orders=multiorders, emchop=emchop)
 
   pdf.close()
 

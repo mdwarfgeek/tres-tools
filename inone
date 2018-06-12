@@ -51,7 +51,7 @@ bld = 0.3212
 def do_vrad(pdf, tmplname, filename,
             tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_vbcv, tmpl_vrad,
             mbjd, wave, flux, e_flux, msk, vbcv,
-            order, dovsini=0, vsini=0, savefile=False):
+            order, dovsini=0, vsini=0, savefile=False, emchop=True):
   # Extract order and clean.
   thistmpl_wave, thistmpl_flux, thistmpl_e_flux = prepord(order, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk)
   thiswave, thisflux, thise_flux = prepord(order, wave, flux, e_flux, msk)
@@ -67,15 +67,19 @@ def do_vrad(pdf, tmplname, filename,
 
   thisflux -= ss
 
-  medflux, sigflux = medsig(thisflux)
-  emmask = thisflux < medflux + 5.0*sigflux
+  if emchop:
+    medflux, sigflux = medsig(thisflux)
+    emmask = thisflux < medflux + 5.0*sigflux
+  else:
+    emmask = numpy.ones_like(thisflux, dtype=numpy.bool)
 
   # Number of measurements (pixels).
   npix = len(thisflux)
 
   if dovsini:
     # Figure out vsini first.
-    frv = fftrv.fftrv(nbin=32*npix, pkfit=0)
+    frv = fftrv.fftrv(nbin=32*npix, pkfit=0,
+                      t_emchop=emchop, s_emchop=emchop)
     
     nvsini = 101
     
@@ -116,7 +120,7 @@ def do_vrad(pdf, tmplname, filename,
   usevsini = vsini
 
   # Correlate.
-  frv = fftrv.fftrv(nbin=32*npix)
+  frv = fftrv.fftrv(nbin=32*npix, t_emchop=emchop, s_emchop=emchop)
 
   z, corr, zbest, hbest, sigt = frv.correlate(thistmpl_wave, thistmpl_flux,
                                               thiswave, thisflux,
@@ -221,7 +225,7 @@ def do_vrad(pdf, tmplname, filename,
 def do_lsd(pdf, filename,
            tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_vbcv, tmpl_vrad,
            mbjd, wave, flux, e_flux, msk, vbcv,
-           vrad, orders, savefile=False):
+           vrad, orders, savefile=False, emchop=True):
   # Compute at 0.5 km/s intervals.
   vl = vrad-velrange
   vh = vrad+velrange
@@ -231,7 +235,7 @@ def do_lsd(pdf, filename,
                               wave, flux, e_flux, msk,
                               orders,
                               vl, vh, nv,
-                              kreg)
+                              kreg, emchop=emchop)
 
   # Optionally save LSD to file.
   if savefile:
@@ -599,6 +603,7 @@ def do_ews(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze,
 ap = argparse.ArgumentParser()
 ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
 ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
+ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
 ap.add_argument("-f", action="store_true", help="save correlations and LSDs to ascii files")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-r", metavar="vsini", type=float, help="use fixed rotation for final velocity analysis")
@@ -609,6 +614,8 @@ rs = read_spec()
 
 if args.o is not None:
   rs.overrideorder = args.o
+
+emchop = not args.E
 
 # Read template.
 tmplsp = rs.read_spec(args.template, istmpl=1, wantstruct=True)
@@ -630,25 +637,29 @@ for ifile, filename in enumerate(filelist):
   vrad, hbest, vsinibest = do_vrad(pdf, tmplname, filename,
                                    tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk, tmplsp.vbcv, tmplsp.vrad,
                                    sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk, sp.vbcv,
-                                   order=rs.singleorder, dovsini=0, savefile=args.f)
+                                   order=rs.singleorder, dovsini=0, savefile=args.f, emchop=emchop)
 
   # LSD.
+  lsdorders = rs.multiorder
+  if args.o is not None:
+    lsdorders = [ args.o ]
+
   do_lsd(pdf, filename,
          tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk, tmplsp.vbcv, tmplsp.vrad,
          sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk, sp.vbcv,
          vrad,
-         orders=rs.multiorder, savefile=args.f)
+         orders=lsdorders, savefile=args.f, emchop=emchop)
 
   if args.r is None:
     vrad, hbest, vsinibest = do_vrad(pdf, tmplname, filename,
                                      tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk, tmplsp.vbcv, tmplsp.vrad,
                                      sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk, sp.vbcv,
-                                     order=rs.singleorder, dovsini=1, savefile=args.f)
+                                     order=rs.singleorder, dovsini=1, savefile=args.f, emchop=emchop)
   elif args.r > 0:
     vrad, hbest, vsinibest = do_vrad(pdf, tmplname, filename,
                                      tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk, tmplsp.vbcv, tmplsp.vrad,
                                      sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk, sp.vbcv,
-                                     order=rs.singleorder, dovsini=0, vsini=args.r, savefile=args.f)
+                                     order=rs.singleorder, dovsini=0, vsini=args.r, savefile=args.f, emchop=emchop)
 
   if sp.blaze is not None:
     # Equivalent width.
