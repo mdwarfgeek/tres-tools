@@ -600,6 +600,13 @@ def do_ews(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze,
 
   return ewha, e_ewha, ewcai, e_ewcai
 
+def get_range(s):
+  ll = s.split(":")
+  if len(ll) == 2:
+    return map(float, ll)
+  else:
+    raise argparse.ArgumentError
+
 ap = argparse.ArgumentParser()
 ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
 ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
@@ -607,6 +614,7 @@ ap.add_argument("-E", action="store_true", help="don't remove emission lines fro
 ap.add_argument("-f", action="store_true", help="save correlations and LSDs to ascii files")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-r", metavar="vsini", type=float, help="use fixed rotation for final velocity analysis")
+ap.add_argument("-w", type=get_range, default=None, help="set wavelength range -w='min:max' in A")
 args = ap.parse_args()
 
 # New read_spec structure.
@@ -620,6 +628,9 @@ emchop = not args.E
 # Read template.
 tmplsp = rs.read_spec(args.template, istmpl=1, wantstruct=True)
 
+if args.w is not None:  # manual wavelength range
+  tmplsp.msk = numpy.logical_and(tmplsp.wave >= args.w[0], tmplsp.wave < args.w[1])
+
 tmplname = stripname(args.template)
 
 filelist = args.filelist
@@ -627,6 +638,9 @@ nf = len(args.filelist)
 
 for ifile, filename in enumerate(filelist):
   sp = rs.read_spec(filename, wantstruct=True)
+
+  if args.w is not None:  # manual wavelength range
+    sp.msk = numpy.logical_and(sp.wave >= args.w[0], sp.wave < args.w[1])
 
   basefile = stripname(filename)
   outfile = basefile + "_inone.pdf"
