@@ -657,7 +657,8 @@ if args.triple:
 
   plt.axhline(mean3, color="red")
 
-plt.errorbar(phi, vfit, yerr=e_vfit, fmt="o", color="black")
+plt.errorbar(phi[0:nobs], vfit[0:nobs], yerr=e_vfit[0:nobs], fmt="o", color="blue")
+plt.errorbar(phi[nobs:2*nobs], vfit[nobs:2*nobs], yerr=e_vfit[nobs:2*nobs], fmt="o", color="green")
 
 if args.triple:
   plt.errorbar(phiorig, v3, yerr=err3, fmt="o", color="black")
@@ -689,9 +690,9 @@ if args.triple:
 else:
   roff2 = 1.1*(rmin1 - rmax2)
 
-plt.errorbar(phi[0:nobs], resid[0:nobs], yerr=e_vfit[0:nobs], fmt="o", color="black")
+plt.errorbar(phi[0:nobs], resid[0:nobs], yerr=e_vfit[0:nobs], fmt="o", color="blue")
 plt.axhline(0, color="blue")
-plt.errorbar(phi[nobs:2*nobs], roff2+resid[nobs:2*nobs], yerr=e_vfit[nobs:2*nobs], fmt="o", color="black")
+plt.errorbar(phi[nobs:2*nobs], roff2+resid[nobs:2*nobs], yerr=e_vfit[nobs:2*nobs], fmt="o", color="green")
 plt.axhline(roff2, color="green")
 
 if args.triple:
