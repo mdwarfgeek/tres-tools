@@ -417,7 +417,11 @@ if args.m is not None:
   plot_chain(samp, args.m + "_chains.png")
 
   print "Acceptance fraction:", samp.acceptance_fraction
-  print "Autocorrelation lengths:", samp.acor
+
+  try:
+    print "Autocorrelation lengths:", samp.acor
+  except:
+    pass
 
   ch = samp.flatchain
 
