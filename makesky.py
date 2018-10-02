@@ -9,7 +9,10 @@ def makesky(wave, flux, deg):
 
   x = (2*wave - (wavemin + wavemax)) / (wavemax - wavemin)
 
+  # Remove NaNs.
+  ww = numpy.isfinite(flux)
+
   # Legendre fit.
-  coef = cliplegfit(x, flux, deg)
+  coef = cliplegfit(x[ww], flux[ww], deg)
 
   return numpy.polynomial.legendre.legval(x, coef)

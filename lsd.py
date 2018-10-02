@@ -38,21 +38,26 @@ def lsd_multiorder(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
     thisflux /= ss
     thise_flux /= ss
 
+    tmpl_ww = numpy.isfinite(thistmpl_flux)
+    ww = numpy.isfinite(thisflux)
+
     if emchop:
       # Clip emission lines.
-      medflux, sigflux = medsig(thistmpl_flux)
-      ww = thistmpl_flux < medflux + 5*sigflux
+      medflux, sigflux = medsig(thistmpl_flux[tmpl_ww])
+      tmpl_ww = numpy.logical_and(tmpl_ww,
+                                  thistmpl_flux < medflux + 5*sigflux)
 
-      thistmpl_wave = thistmpl_wave[ww]
-      thistmpl_flux = thistmpl_flux[ww]
-      thistmpl_e_flux = thistmpl_e_flux[ww]
+      medflux, sigflux = medsig(thisflux[ww])
+      ww = numpy.logical_and(ww,
+                             thisflux < medflux + 5*sigflux)
 
-      medflux, sigflux = medsig(thisflux)
-      ww = thisflux < medflux + 5*sigflux
+    thistmpl_wave = thistmpl_wave[tmpl_ww]
+    thistmpl_flux = thistmpl_flux[tmpl_ww]
+    thistmpl_e_flux = thistmpl_e_flux[tmpl_ww]
       
-      thiswave = thiswave[ww]
-      thisflux = thisflux[ww]
-      thise_flux = thise_flux[ww]
+    thiswave = thiswave[ww]
+    thisflux = thisflux[ww]
+    thise_flux = thise_flux[ww]
 
     # Figure out which pixels in are always in range.
     wanttmpl = thiswave - zl*thiswave

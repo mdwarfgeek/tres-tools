@@ -86,6 +86,8 @@ class read_spec:
         specname = "elodie"
       elif val == "FEROS":
         specname = "feros"
+      elif val == "CARMENES":
+        specname = "carmenes"
 
     if specname is None:
       raise RuntimeError("unrecognised instrument")

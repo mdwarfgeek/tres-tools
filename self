@@ -62,15 +62,17 @@ def do_vrad(pdf, tmplname, filename,
 
   thisflux -= ss
 
+  tmpl_emmask = numpy.isfinite(thistmpl_flux)
+  emmask = numpy.isfinite(thisflux)
+
   if emchop:
-    medflux, sigflux = medsig(thistmpl_flux)
-    tmpl_emmask = thistmpl_flux < medflux + 5.0*sigflux
+    medflux, sigflux = medsig(thistmpl_flux[tmpl_emmask])
+    tmpl_emmask = numpy.logical_and(tmpl_emmask,
+                                    thistmpl_flux < medflux + 5.0*sigflux)
     
-    medflux, sigflux = medsig(thisflux)
-    emmask = thisflux < medflux + 5.0*sigflux
-  else:
-    tmpl_emmask = numpy.ones_like(thistmpl_flux, dtype=numpy.bool)
-    emmask = numpy.ones_like(thisflux, dtype=numpy.bool)
+    medflux, sigflux = medsig(thisflux[emmask])
+    emmask = numpy.logical_and(emmask,
+                               thisflux < medflux + 5.0*sigflux)
 
   # Number of measurements (pixels).
   npix = len(thisflux)
@@ -111,12 +113,14 @@ def do_vrad(pdf, tmplname, filename,
 
   wwlev = numpy.logical_and(thistmpl_wave >= levmin,
                             thistmpl_wave <= levmax)
+  wwlev = numpy.logical_and(wwlev, tmpl_emmask)
 
   ytmplmed, ytmplsig = medsig(thistmpl_rawflux[wwlev])
   ytmpl = ytmplmed+3*ytmplsig
 
   wwlev = numpy.logical_and(thiswave >= levmin,
                             thiswave <= levmax)
+  wwlev = numpy.logical_and(wwlev, emmask)
 
   ytargmed, ytargsig = medsig(thisrawflux[wwlev])
   ytarg = ytargmed+3*ytargsig

@@ -67,11 +67,13 @@ def do_vrad(pdf, tmplname, filename,
 
   thisflux -= ss
 
+  # Mask NaNs.
+  emmask = numpy.isfinite(thisflux)
+
   if emchop:
-    medflux, sigflux = medsig(thisflux)
-    emmask = thisflux < medflux + 5.0*sigflux
-  else:
-    emmask = numpy.ones_like(thisflux, dtype=numpy.bool)
+    medflux, sigflux = medsig(thisflux[emmask])
+    emmask = numpy.logical_and(emmask,
+                               thisflux < medflux + 5.0*sigflux)
 
   # Number of measurements (pixels).
   npix = len(thisflux)
@@ -288,6 +290,7 @@ def plotreg(speclist, tresorder, xmark, xwidth, name, legend, a, b, c):
 
      # Where are the pixels within the desired wavelength range?
      ww = numpy.logical_and(wave > wl, wave < wh)
+     ww = numpy.logical_and(ww, numpy.isfinite(flux))
 
      # Figure out which order to plot.  Take the one with the most
      # median counts if more than one contains the desired range.
@@ -335,8 +338,11 @@ def plotreg(speclist, tresorder, xmark, xwidth, name, legend, a, b, c):
      ss = makesky(thiswave, thisflux, 4)
      tt = thisflux - ss
 
-     medtt, sigtt = medsig(tt)
-     emmask = tt < medtt + 5.0*sigtt
+     emmask = numpy.isfinite(thisflux)
+
+     medtt, sigtt = medsig(tt[emmask])
+     emmask = numpy.logical_and(emmask,
+                                tt < medtt + 5.0*sigtt)
 
      # Make sure the present feature is excluded in case
      # we're dealing with an emission feature.
