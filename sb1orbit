@@ -16,6 +16,9 @@ from sb1 import *
 
 import fussyastronomer
 
+# Figure size.
+figsize = (8.0, 6.0)  # inches
+
 # Deal with command-line arguments.
 ap = argparse.ArgumentParser()
 ap.add_argument("pset", help="parameter file")
@@ -326,7 +329,7 @@ def logpost (trial, x, y, yerr):
   return loglike - logprior
 
 def plot_chain(samp, outfile):
-  fig = plt.figure()
+  fig = plt.figure(figsize=figsize)
 
   for idim in range(ndim):
     plt.subplot(ndim, 1, idim+1)
@@ -681,6 +684,8 @@ typplot.fill(eb.OBS_VRAD1)
 yplot1 = eb.model(parm, phiplot, typplot, eb.FLAG_PHI)
 yplot1 = parm[PAR_GAMMA] + yplot1 * parm[PAR_K1]
 
+fig = plt.figure(figsize=figsize)
+
 plt.subplot(2, 1, 1)
 
 plt.plot(phiplot, yplot1, color="blue")
@@ -697,10 +702,10 @@ if args.double:
 
   plt.axhline(mean2, color="green")
 
-plt.errorbar(phi, vfit, yerr=e_vfit, fmt="o", color="black")
+plt.errorbar(phi, vfit, yerr=e_vfit, fmt="o", color="blue")
 
 if args.double:
-  plt.errorbar(phiorig, v2, yerr=err2, fmt="o", color="black")
+  plt.errorbar(phiorig, v2, yerr=err2, fmt="o", color="green")
 
 plt.xlim(phimin, phimax)
 
@@ -719,7 +724,7 @@ chisq = numpy.sum((resid / e_vfit)**2)
 
 print "Final chi squared =", chisq, "ndof =", ndof
 
-plt.errorbar(phi, resid, yerr=e_vfit, fmt="o", color="black")
+plt.errorbar(phi, resid, yerr=e_vfit, fmt="o", color="blue")
 plt.axhline(0, color="blue")
 
 if args.double:
@@ -727,7 +732,7 @@ if args.double:
   rmax2 = numpy.max(resid2+err2)
   roff2 = 1.1*(rmin1 - rmax2)
 
-  plt.errorbar(phiorig, roff2+resid2, yerr=err2, fmt="o", color="black")
+  plt.errorbar(phiorig, roff2+resid2, yerr=err2, fmt="o", color="green")
   plt.axhline(roff2, color="green")
 
 plt.xlim(phimin, phimax)
@@ -744,7 +749,6 @@ else:
 if args.m is None:
   plt.show()
 else:
-  fig = plt.gcf()
   fig.savefig(args.m + "_orbit.pdf")
   fig.savefig(args.m + "_orbit.eps")
-
+  plt.close()

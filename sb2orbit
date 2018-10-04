@@ -15,6 +15,9 @@ from nlfit import *
 
 import fussyastronomer
 
+# Figure size.
+figsize = (8.0, 6.0)  # inches
+
 # Deal with command-line arguments.
 ap = argparse.ArgumentParser()
 ap.add_argument("pset", help="parameter file")
@@ -267,7 +270,7 @@ def logpost (trial, x, y, yerr):
   return loglike - logprior
 
 def plot_chain(samp, outfile):
-  fig = plt.figure()
+  fig = plt.figure(figsize=figsize)
 
   for idim in range(ndim):
     plt.subplot(ndim, 1, idim+1)
@@ -639,6 +642,8 @@ typplot.fill(eb.OBS_VRAD2)
 yplot2 = eb.model(parm, phiplot, typplot, eb.FLAG_PHI)
 yplot2 = parm[PAR_GAMMA] - yplot2 * parm[PAR_KTOT] / (1.0 + parm[eb.PAR_Q])
 
+fig = plt.figure(figsize=figsize)
+
 plt.subplot(2, 1, 1)
 
 plt.plot(phiplot, yplot1, color="blue")
@@ -665,7 +670,7 @@ plt.errorbar(phi[0:nobs], vfit[0:nobs], yerr=e_vfit[0:nobs], fmt="o", color="blu
 plt.errorbar(phi[nobs:2*nobs], vfit[nobs:2*nobs], yerr=e_vfit[nobs:2*nobs], fmt="o", color="green")
 
 if args.triple:
-  plt.errorbar(phiorig, v3, yerr=err3, fmt="o", color="black")
+  plt.errorbar(phiorig, v3, yerr=err3, fmt="o", color="red")
 
 plt.xlim(phimin, phimax)
 
@@ -700,7 +705,7 @@ plt.errorbar(phi[nobs:2*nobs], roff2+resid[nobs:2*nobs], yerr=e_vfit[nobs:2*nobs
 plt.axhline(roff2, color="green")
 
 if args.triple:
-  plt.errorbar(phiorig, roff3+resid3, yerr=err3, fmt="o", color="black")
+  plt.errorbar(phiorig, roff3+resid3, yerr=err3, fmt="o", color="red")
   plt.axhline(roff3, color="red")
 
 plt.xlim(phimin, phimax)
@@ -713,7 +718,7 @@ plt.ylabel("Residual + const (km/s)")
 if args.m is None:
   plt.show()
 else:
-  fig = plt.gcf()
   fig.savefig(args.m + "_orbit.pdf")
   fig.savefig(args.m + "_orbit.eps")
+  plt.close()
 
