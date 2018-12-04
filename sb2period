@@ -138,7 +138,12 @@ for ilc, lc in enumerate(buf):
 
     # Conjunction phase and time = downward-going zero-crossing.
     phic = math.atan2(bsc[1], -bsc[0]) / (2.0*math.pi)
-    print "T_0 =", bjdbase + phic / vbest
+
+    # Offset to mean of dataset.
+    ioff = round(numpy.mean(t) * vbest)
+
+    # Final T_0 value.
+    print "T_0 =", bjdbase + (ioff+phic) / vbest
 
     plt.plot(modx, mody, color="red")
 
