@@ -619,6 +619,7 @@ ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @l
 ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
 ap.add_argument("-f", action="store_true", help="save correlations and LSDs to ascii files")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
+ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 ap.add_argument("-r", metavar="vsini", type=float, help="use fixed rotation for final velocity analysis")
 ap.add_argument("-w", type=get_range, default=None, help="set wavelength range -w='min:max' in A")
 args = ap.parse_args()
@@ -632,7 +633,7 @@ if args.o is not None:
 emchop = not args.E
 
 # Read template.
-tmplsp = rs.read_spec(args.template, istmpl=1, wantstruct=True)
+tmplsp = rs.read_spec(args.template, istmpl=1, wantstruct=True, doreject=not args.R)
 
 if args.w is not None:  # manual wavelength range
   tmplsp.msk = numpy.logical_and(tmplsp.wave >= args.w[0], tmplsp.wave < args.w[1])
@@ -643,7 +644,7 @@ filelist = args.filelist
 nf = len(args.filelist)
 
 for ifile, filename in enumerate(filelist):
-  sp = rs.read_spec(filename, wantstruct=True)
+  sp = rs.read_spec(filename, wantstruct=True, doreject=not args.R)
 
   if args.w is not None:  # manual wavelength range
     sp.msk = numpy.logical_and(sp.wave >= args.w[0], sp.wave < args.w[1])

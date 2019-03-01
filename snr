@@ -10,6 +10,7 @@ from read_spec import *
 ap = argparse.ArgumentParser()
 ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
+ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 args = ap.parse_args()
 
 # New read_spec structure.
@@ -19,7 +20,7 @@ if args.o is not None:
   rs.overrideorder = args.o
 
 for filename in args.filelist:
-  sp = rs.read_spec(filename, wantstruct=True)
+  sp = rs.read_spec(filename, wantstruct=True, doreject=not args.R)
 
   thiswave, thisflux, thise_flux = prepord(rs.singleorder, sp.wave, sp.flux, sp.e_flux, sp.msk)
 

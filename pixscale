@@ -12,6 +12,7 @@ from read_spec import *
 ap = argparse.ArgumentParser()
 ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
+ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 args = ap.parse_args()
 
 # New read_spec structure.
@@ -21,7 +22,7 @@ if args.o is not None:
   rs.overrideorder = args.o
 
 # Read template.
-tmplsp = rs.read_spec(args.template, wantstruct=True)
+tmplsp = rs.read_spec(args.template, wantstruct=True, doreject=not args.R)
 
 thistmpl_wave, thistmpl_flux, thistmpl_e_flux = prepord(rs.singleorder, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk)
 

@@ -272,6 +272,7 @@ ap.add_argument("-a", help="automatically optimize parameters par1,par2,...")
 ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-p", action="store_true", help="save plots of 2-D correlation function")
+ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 args = ap.parse_args()
 
 # New read_spec structure.
@@ -283,8 +284,8 @@ if args.o is not None:
 emchop = not args.E
 
 # Read templates.
-tmplasp = rs.read_spec(args.tmpla, istmpl=1, wantstruct=True)
-tmplbsp = rs.read_spec(args.tmplb, istmpl=1, wantstruct=True)
+tmplasp = rs.read_spec(args.tmpla, istmpl=1, wantstruct=True, doreject=not args.R)
+tmplbsp = rs.read_spec(args.tmplb, istmpl=1, wantstruct=True, doreject=not args.R)
 
 parm = numpy.empty([NPARM], dtype=numpy.double)
 
@@ -300,7 +301,7 @@ nf = len(args.filelist)
 # Read targets.
 targlist = [None] * nf
 for ifile, filename in enumerate(filelist):
-  targlist[ifile] = rs.read_spec(filename, wantstruct=True)
+  targlist[ifile] = rs.read_spec(filename, wantstruct=True, doreject=not args.R)
 
 minvela, maxvela = args.alim
 minvelb, maxvelb = args.blim

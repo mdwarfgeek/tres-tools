@@ -36,7 +36,7 @@ class read_spec:
     self.multiorder = None
     self.overrideorder = None
 
-  def read_spec(self, filespec, istmpl=False, wantstruct=False):
+  def read_spec(self, filespec, istmpl=False, wantstruct=False, doreject=True):
     # Convert file specification from script argument into a file list.
     # The string "filespec" can be a single item or comma-separated
     # list of items.  Each item can be a filename or @list to read an
@@ -135,6 +135,11 @@ class read_spec:
       exptimelist = numpy.empty([nspec])
       wtlist = numpy.empty([nspec])
 
+      fluxlist = [None] * nspec
+      e_fluxlist = [None] * nspec
+      normedlist = [None] * nspec
+      e_normedlist = [None] * nspec
+
       mbjdlist[0] = mbjd
       zblist[0] = zb
       exptimelist[0] = exptime
@@ -142,13 +147,14 @@ class read_spec:
       normord = self.singleorder-1
       wtlist[0] = numpy.median(flux[normord,:])
 
-      # Sum of squares of uncertainties.
-      ssq = numpy.zeros_like(e_flux)
-      ssq += e_flux*e_flux
+      fluxlist[0] = flux
+      e_fluxlist[0] = e_flux
+      normedlist[0] = flux
+      e_normedlist[0] = e_flux
 
       nord = wave.shape[0]
 
-      # Read all spectra and combine.
+      # Read all spectra and interpolate.
       # XXX - blaze currently ignored.
       for i, filename in enumerate(filelist[1:]):
         thismbjd, thiszb, thisexptime, thiswave, thisflux, thise_flux, thisblaze = self.read(filename, self.obs)
@@ -157,14 +163,53 @@ class read_spec:
         zblist[i+1] = thiszb
         exptimelist[i+1] = thisexptime
 
+        fluxout = numpy.empty_like(flux)
+        e_fluxout = numpy.empty_like(flux)
+
+        wtout = None
+
         for iord in range(nord):
           interp_flux, interp_e_flux = finterp(wave[iord,:], thiswave[iord,:], thisflux[iord,:], thise_flux[iord,:])
 
-          flux[iord,:] += interp_flux
-          ssq[iord,:] += interp_e_flux**2
+          fluxout[iord,:] = interp_flux
+          e_fluxout[iord,:] = interp_e_flux
 
           if iord == normord:
-            wtlist[i+1] = numpy.median(interp_flux)
+            wtout = numpy.median(interp_flux)
+            wtlist[i+1] = wtout
+
+        fluxlist[i+1] = fluxout
+        e_fluxlist[i+1] = e_fluxout
+        normedlist[i+1] = fluxout * wtlist[0] / wtout
+        e_normedlist[i+1] = e_fluxout * wtlist[0] / wtout
+
+      fluxlist = numpy.array(fluxlist)
+      e_fluxlist = numpy.array(e_fluxlist)
+      normedlist = numpy.array(normedlist)
+      e_normedlist = numpy.array(e_normedlist)
+
+      if doreject:
+        # Attempt to locate +ve outliers using median and uncertainties.
+        # Individual spectra are normalized to the first one using counts
+        # in reference order to reduce effect of exposure time variations.
+        mednormed = numpy.median(normedlist, axis=0)
+        mederrnormed = numpy.median(e_normedlist, axis=0)
+
+        # Per-pixel weights for final combine (0 or 1).
+        # Assumes error in median = median error, i.e. we get no noise
+        # improvement from taking the median.  This isn't true and
+        # becomes increasingly pessimistic as N gets larger, but typically
+        # we expect this to be used for very small N where it's important
+        # to account for the error in the median and this can't be done
+        # empirically.  Cosmics we need to reject are usually very large
+        # deviations so I think it should still work okay.
+        combmask = normedlist - mednormed < 5*numpy.hypot(e_normedlist, mederrnormed)
+      else:
+        combmask = numpy.ones_like(fluxlist, dtype=numpy.bool)
+
+      # Weighted mean but scale back to equivalent of sum with no rejects.
+      flux = numpy.average(fluxlist, axis=0, weights=combmask) * nspec
+      ssq = numpy.average(e_fluxlist**2, axis=0, weights=combmask) * nspec
 
       # Final uncertainty in sum = quadrature sum of uncertainties.
       e_flux = numpy.sqrt(ssq)

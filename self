@@ -279,6 +279,7 @@ ap.add_argument("template", help="template spectrum file or @list of files to be
 ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
 ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
+ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 args = ap.parse_args()
 
 # New read_spec structure.
@@ -290,7 +291,7 @@ if args.o is not None:
 emchop = not args.E
 
 # Read epoch to use as template.
-tmplsp = rs.read_spec(args.template, wantstruct=True)
+tmplsp = rs.read_spec(args.template, wantstruct=True, doreject=not args.R)
 
 tmplname = re.sub(r'_cb\.spec$', "", stripname(args.template))
 
@@ -298,7 +299,7 @@ filelist = args.filelist
 nf = len(args.filelist)
 
 for ifile, filename in enumerate(filelist):
-  sp = rs.read_spec(filename, wantstruct=True)
+  sp = rs.read_spec(filename, wantstruct=True, doreject=not args.R)
 
   targname = re.sub(r'_cb\.spec$', "", stripname(filename))
 
