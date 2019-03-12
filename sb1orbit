@@ -51,7 +51,7 @@ import matplotlib.pyplot as plt
 numpy.random.seed(42)
 
 # Build main parameter vector and metadata vectors.
-parm = numpy.zeros(eb.NPAR+4, dtype=numpy.double)
+parm = numpy.zeros(eb.NPAR+5, dtype=numpy.double)
 parm_names = list(eb.parnames)
 parm_texsym = list(eb.partexsym)
 parm_units = list(eb.parunits)
@@ -61,17 +61,22 @@ parm_names.append("gamma")
 parm_texsym.append("\\gamma")
 parm_units.append("km/s")
 
-PAR_K1 = eb.NPAR+1
+PAR_DRIFT = eb.NPAR+1
+parm_names.append("gamma_dot")
+parm_texsym.append("\\dot{\\gamma}")
+parm_units.append("km/s/day")
+
+PAR_K1 = eb.NPAR+2
 parm_names.append("K1")
 parm_texsym.append("K")
 parm_units.append("km/s")
 
-PAR_S = eb.NPAR+2
+PAR_S = eb.NPAR+3
 parm_names.append("sigma")
 parm_texsym.append("\\sigma")
 parm_units.append("km/s")
 
-PAR_M1 = eb.NPAR+3
+PAR_M1 = eb.NPAR+4
 parm_names.append("M_1")
 parm_texsym.append("M_1")
 parm_units.append("Msol")
@@ -273,7 +278,7 @@ def fit_func (trial, ymod):
     eb.model(ourparm, bjdfit, typ, 0, out=ymod)
 
   ymod *= ourparm[PAR_K1]
-  ymod += ourparm[PAR_GAMMA]
+  ymod += ourparm[PAR_GAMMA] + ourparm[PAR_DRIFT]*(bjdfit-ourparm[eb.PAR_T0])
 
 # Function returning log of posterior probability for MCMC.
 def logpost (trial, x, y, yerr):
@@ -301,7 +306,7 @@ def logpost (trial, x, y, yerr):
     ymod = eb.model(ourparm, x, typ, 0)
 
   ymod *= ourparm[PAR_K1]
-  ymod += ourparm[PAR_GAMMA]
+  ymod += ourparm[PAR_GAMMA] + ourparm[PAR_DRIFT]*(x-ourparm[eb.PAR_T0])
   
   if args.e:
     wt = 1.0 / (ourparm[PAR_S]**2 + e_v1**2)
@@ -683,6 +688,8 @@ else:
 typplot.fill(eb.OBS_VRAD1)
 yplot1 = eb.model(parm, phiplot, typplot, eb.FLAG_PHI)
 yplot1 = parm[PAR_GAMMA] + yplot1 * parm[PAR_K1]
+if args.u:
+  yplot1 += parm[PAR_DRIFT] * phiplot*parm[eb.PAR_P]
 
 fig = plt.figure(figsize=figsize)
 
@@ -691,21 +698,52 @@ plt.subplot(2, 1, 1)
 plt.plot(phiplot, yplot1, color="blue")
 
 if args.double:
-  mean2 = numpy.mean(v2)
-  resid2 = v2 - mean2
+  drift = False
+  for ipar, jpar in enumerate(plist):
+    if jpar == PAR_DRIFT:
+      drift = True
+
+  if drift:
+    coef = numpy.polynomial.polynomial.polyfit(bjd-parm[eb.PAR_T0], v2, 1, full=False)
+    mod2 = numpy.polynomial.polynomial.polyval(bjd-parm[eb.PAR_T0], coef)
+    mean2 = coef[0]
+  else:
+    mean2 = numpy.mean(v2)
+    mod2 = mean2
+
+  resid2 = v2 - mod2
   if args.e:
     err2 = numpy.hypot(parm[PAR_S], e_v1)  # consistent but probably no!
   else:
     err2 = parm[PAR_S] / hh
 
-  print "gamma2 =", mean2, "km/s"
+  if drift:
+    sgn = "+"
+    if coef[1] < 0:
+      sgn = "-"
+    print "gamma2 =", coef[0], "km/s", sgn, abs(coef[1]), "km/s/day"
+  else:
+    print "gamma2 =", mean2, "km/s"
 
-  plt.axhline(mean2, color="green")
+  if args.u and drift:
+    dbjdmin = phimin * parm[eb.PAR_P]
+    dbjdmax = phimax * parm[eb.PAR_P]
 
-plt.errorbar(phi, vfit, yerr=e_vfit, fmt="o", color="blue")
+    plt.plot([phimin, phimax], [ numpy.polynomial.polynomial.polyval(dbjdmin, coef),
+                                 numpy.polynomial.polynomial.polyval(dbjdmax, coef) ], color="green")
+  else:
+    plt.axhline(mean2, color="green")
+
+if args.u:
+  plt.errorbar(phi, vfit, yerr=e_vfit, fmt="o", color="blue")
+else:
+  plt.errorbar(phi, vfit-parm[PAR_DRIFT]*(bjd-parm[eb.PAR_T0]), yerr=e_vfit, fmt="o", color="blue")
 
 if args.double:
-  plt.errorbar(phiorig, v2, yerr=err2, fmt="o", color="green")
+  if args.u:
+    plt.errorbar(phiorig, v2, yerr=err2, fmt="o", color="green")
+  else:
+    plt.errorbar(phiorig, v2-mod2+mean2, yerr=err2, fmt="o", color="green")
 
 plt.xlim(phimin, phimax)
 
