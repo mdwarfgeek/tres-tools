@@ -280,6 +280,12 @@ def fit_func (trial, ymod):
   ymod *= ourparm[PAR_K1]
   ymod += ourparm[PAR_GAMMA] + ourparm[PAR_DRIFT]*(bjdfit-ourparm[eb.PAR_T0])
 
+def vecok (ourparm):
+  ecc = math.hypot(ourparm[eb.PAR_ECOSW], ourparm[eb.PAR_ESINW])
+  return(ecc < 1.0 and
+         ((args.e and ourparm[PAR_S] >= 0) or
+          (not args.e and ourparm[PAR_S] > 0)))
+
 # Function returning log of posterior probability for MCMC.
 def logpost (trial, x, y, yerr):
   # Parameter vector.
@@ -287,16 +293,9 @@ def logpost (trial, x, y, yerr):
   ourparm[plist] = trial
 
   # Check ranges.
-  ecc = math.hypot(ourparm[eb.PAR_ECOSW], ourparm[eb.PAR_ESINW])
-  if ecc >= 1.0:
+  if not vecok(ourparm):
+#    print "not vecok for", ourparm
     return -numpy.inf
-
-  if args.e:
-    if ourparm[PAR_S] < 0:
-      return -numpy.inf
-  else:
-    if ourparm[PAR_S] <= 0:
-      return -numpy.inf
 
   # Likelihood.
   if args.t:
@@ -377,6 +376,7 @@ if args.m is not None:
 
   samp = emcee.EnsembleSampler(nwalk, ndim, logpost, args=(bjdfit, vfit, e_vfit))
 
+  cent = numpy.copy(vfinal)
   pert = 3*numpy.copy(verr)
 
   for iparm in range(ndim):
@@ -396,7 +396,25 @@ if args.m is not None:
       else:
         pert[iparm] = 0.01
 
-  pos = [vfinal + pert * numpy.random.randn(ndim) for i in range(nwalk)]
+  pos = [None]*nwalk
+
+  for iwalk in range(nwalk):
+    trial = None
+
+    for isim in range(100):
+      trial = cent + pert * numpy.random.randn(ndim)
+
+      trialparm = numpy.copy(parm)
+      trialparm[plist] = trial
+
+      isok = vecok(trialparm)
+      if isok:
+        break
+      
+    if not isok:
+      raise RuntimeError("couldn't find valid starting point")
+
+    pos[iwalk] = trial
 
   if args.n is not None:
     nsim = args.n
