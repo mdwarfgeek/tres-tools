@@ -145,7 +145,8 @@ class read_spec:
       exptimelist[0] = exptime
 
       normord = self.singleorder-1
-      wtlist[0] = numpy.median(flux[normord,:])
+      thisflux = flux[normord,:]
+      wtlist[0] = numpy.median(thisflux[numpy.isfinite(thisflux)])
 
       fluxlist[0] = flux
       e_fluxlist[0] = e_flux
@@ -175,7 +176,7 @@ class read_spec:
           e_fluxout[iord,:] = interp_e_flux
 
           if iord == normord:
-            wtout = numpy.median(interp_flux)
+            wtout = numpy.median(interp_flux[numpy.isfinite(interp_flux)])
             wtlist[i+1] = wtout
 
         fluxlist[i+1] = fluxout
@@ -208,8 +209,15 @@ class read_spec:
         combmask = numpy.ones_like(fluxlist, dtype=numpy.bool)
 
       # Weighted mean but scale back to equivalent of sum with no rejects.
-      flux = numpy.average(fluxlist, axis=0, weights=combmask) * nspec
-      ssq = numpy.average(e_fluxlist**2, axis=0, weights=combmask) * nspec
+      swt = numpy.sum(combmask, axis=0)
+
+      norm = numpy.empty_like(swt, dtype=numpy.double)
+      norm.fill(numpy.nan)
+
+      norm[swt > 0] = float(nspec) / swt[swt > 0]
+
+      flux = numpy.sum(fluxlist*combmask, axis=0) * norm
+      ssq = numpy.sum((e_fluxlist**2)*combmask, axis=0) * norm
 
       # Final uncertainty in sum = quadrature sum of uncertainties.
       e_flux = numpy.sqrt(ssq)
