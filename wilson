@@ -4,8 +4,11 @@ import sys
 import re
 import math
 import numpy
-import fitsio
 import matplotlib.pyplot as plt
+
+if len(sys.argv) != 2:
+  print >>sys.stderr, "Usage:\t", sys.argv[0], "velfile"
+  sys.exit(1)
 
 vels = numpy.genfromtxt(sys.argv[1],
                         dtype={"names": ("bjd", "v1", "v2", "r"),
