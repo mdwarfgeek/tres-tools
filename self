@@ -22,7 +22,6 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import InterpolatedUnivariateSpline
 
 from medsig import *
-from poly import *
 
 from lsd import *
 from makesky import *

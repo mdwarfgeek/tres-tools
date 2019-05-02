@@ -21,8 +21,6 @@ import todcor
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 
-from poly import *
-
 from makesky import *
 from prepord import *
 from read_spec import *
