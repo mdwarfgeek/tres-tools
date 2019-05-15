@@ -147,6 +147,15 @@ name2iparm = {}
 for iparm, name in enumerate(parm_names):
   name2iparm[name] = iparm
 
+# Derived parameters.
+dermap = [eb.PAR_E, eb.PAR_OMEGA, eb.PAR_A, eb.PAR_MTOT, eb.PAR_M1, eb.PAR_M2]
+
+dernames = ["e", "omega", "a sin i", "(M_1+M_2) sin^3 i", "M_1 sin^3 i", "M_2 sin^3 i", "Tperi"]
+dertexsym = ["e", "\\omega", "a \\sin i", "(M_1+M_2) \\sin^3 i", "M_1 \\sin^3 i", "M_2 \\sin^3 i", "T_{\\rm peri}"]
+derunits = ["", "deg", "AU", "Msol", "Msol", "Msol", "BJD"]
+
+nder = len(dernames)
+
 # Initialize a couple of parameters we don't use to sensible values
 # to avoid floating point exceptions in the model calculation.
 parm[eb.PAR_RASUM] =   0.001  # dummy value
@@ -546,14 +555,6 @@ if args.m is not None:
   # Derived parameters.
   nsamp = ch.shape[0]
 
-  dermap = [eb.PAR_E, eb.PAR_OMEGA, eb.PAR_A, eb.PAR_MTOT, eb.PAR_M1, eb.PAR_M2]
-
-  dernames = ["e", "omega", "a sin i", "(M_1+M_2) sin^3 i", "M_1 sin^3 i", "M_2 sin^3 i", "Tperi"]
-  dertexsym = ["e", "\\omega", "a \\sin i", "(M_1+M_2) \\sin^3 i", "M_1 \\sin^3 i", "M_2 \\sin^3 i", "T_{\\rm peri}"]
-  derunits = ["", "deg", "AU", "Msol", "Msol", "Msol", "BJD"]
-
-  nder = len(dernames)
-
   vder = numpy.empty([nsamp, nder])
   mkvec = numpy.empty([nsamp])
 
@@ -677,6 +678,38 @@ if args.m is not None:
     print "Median rms(2) =", numpy.median(parm[PAR_S2]/hh), "km/s"
   else:
     print "Median rms =", numpy.median(parm[PAR_S1]/hh), "km/s"
+
+else:
+  # Derived parameters for L-M model.
+  thisvder = eb.getvder(parm, parm[PAR_GAMMA1], parm[PAR_KTOT])
+
+  # Change units of semimajor axis from Rsol to AU for consistency
+  # with SB1 program outputs.
+  thisvder[eb.PAR_A] *= eb.RSUN / eb.AU
+
+  phiperi = eb.phiperi(parm)
+
+  tperi = parm[eb.PAR_T0] + parm[eb.PAR_P] * phiperi
+
+  # Make vector.
+  vder = numpy.empty([nder])
+
+  vder[0:len(dermap)] = thisvder[dermap]
+  vder[len(dermap)] = tperi
+
+  print "Derived parameters:"
+
+  for ipar, name in enumerate(dernames):
+    unit = derunits[ipar]
+
+    val = vder[ipar]
+
+    if name == "Tperi":
+      val += tbase
+
+    line = "{0:<18} {1:12.6f} {2}".format(name, val, unit)
+
+    print line
 
 # Phases of observations.
 tmp = (bjdfit - parm[eb.PAR_T0]) / parm[eb.PAR_P]

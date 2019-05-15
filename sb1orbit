@@ -88,6 +88,13 @@ name2iparm = {}
 for iparm, name in enumerate(parm_names):
   name2iparm[name] = iparm
 
+# Derived parameters.
+dernames = ["e", "omega", "Tperi", "a1 sin i", "f1(M)", "q (sin i = 1)", "a (sin i = 1)", "M_2 (sin i = 1)", "M_2 (sin i = 1)"]
+dertexsym = ["e", "\\omega", "T_{\\rm peri}", "a_1 \\sin i", "f_1(M)", "q_{\\rm min}", "a_{\\rm min}", "M_{2,{\\rm min}}", "M_{2,{\\rm min}}"]
+derunits = ["", "deg", "BJD", "AU", "Msol", "", "AU", "Msol", "MJup"]
+
+nder = len(dernames)
+
 # Initialize a couple of parameters we don't use to sensible values
 # to avoid floating point exceptions in the model calculation.
 parm[eb.PAR_RASUM] =   0.001  # dummy value
@@ -552,11 +559,7 @@ if args.m is not None:
   # Derived parameters.
   nsamp = ch.shape[0]
 
-  dernames = ["e", "omega", "Tperi", "a1 sin i", "f1(M)", "q (sin i = 1)", "a (sin i = 1)", "M_2 (sin i = 1)", "M_2 (sin i = 1)"]
-  dertexsym = ["e", "\\omega", "T_{\\rm peri}", "a_1 \\sin i", "f_1(M)", "q_{\\rm min}", "a_{\\rm min}", "M_{2,{\\rm min}}", "M_{2,{\\rm min}}"]
-  derunits = ["", "deg", "BJD", "AU", "Msol", "", "AU", "Msol", "MJup"]
-
-  vder = numpy.empty([nsamp, len(dernames)])
+  vder = numpy.empty([nsamp, nder])
   mkvec = numpy.empty([nsamp])
 
   for isamp in range(nsamp):
@@ -672,6 +675,62 @@ if args.m is not None:
 
   lfp.close()
   tfp.close()
+
+else:
+  # Derived parameters for L-M model.
+  esinw = parm[eb.PAR_ESINW]
+  ecosw = parm[eb.PAR_ECOSW]
+
+  m1 = parm[PAR_M1]
+
+  ecc = math.hypot(esinw, ecosw)
+  argper = math.degrees(math.atan2(esinw, ecosw))
+  if argper < 0.0:  # wrap to conventional range [0,360)
+    argper += 360.0
+
+  phiperi = eb.phiperi(parm)
+
+  tperi = parm[eb.PAR_T0] + parm[eb.PAR_P] * phiperi
+
+  # a1 sin i
+  a1sini = semmaj1(parm[eb.PAR_ESINW], parm[eb.PAR_ECOSW],
+                   parm[eb.PAR_P],
+                   parm[PAR_K1])
+
+  # Mass function.
+  f1 = massfunc(parm[eb.PAR_ESINW], parm[eb.PAR_ECOSW],
+                parm[eb.PAR_P],
+                parm[PAR_K1])
+
+  # Solve for mass ratio, secondary mass and semimajor axis.
+  omega = eb.TWOPI / (parm[eb.PAR_P] * eb.DAY)
+  
+  q = qfromsb1(parm[eb.PAR_ESINW], parm[eb.PAR_ECOSW],
+               parm[eb.PAR_P],
+               parm[PAR_K1],
+               m1,
+               1.0)
+  
+  semmaj = (eb.GMSUN * m1 * (1.0 + q) / (omega*omega))**(1.0/3.0)
+  
+  m2 = m1 * q
+  
+  # Make vector.
+  vder = numpy.array([ecc, argper, tperi, a1sini, f1, q, semmaj/eb.AU, m2, m2*eb.GMSUN/eb.GMJUP])
+
+  print "Derived parameters:"
+
+  for ipar, name in enumerate(dernames):
+    unit = derunits[ipar]
+
+    val = vder[ipar]
+
+    if name == "Tperi":
+      val += tbase
+
+    line = "{0:<18} {1:13.7f} {2}".format(name, val, unit)
+
+    print line
 
 # Phases of observations.
 tmp = (bjdfit - parm[eb.PAR_T0]) / parm[eb.PAR_P]
