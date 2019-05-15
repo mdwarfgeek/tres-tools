@@ -72,28 +72,54 @@ with open(args.pset, "r") as fp:
     pset_lines.append(ll)
 
 # Detect options.
+mode_g = 0
 mode_s = 0
+
+if "gamma1" in pset_names and "gamma2" in pset_names:
+  mode_g = 1
 
 if "sigma1" in pset_names and "sigma2" in pset_names:
   mode_s = 1
 
 # Build main parameter vector and metadata vectors.
-parm = numpy.zeros(eb.NPAR+3+mode_s, dtype=numpy.double)
+parm = numpy.zeros(eb.NPAR+3+mode_g+mode_s, dtype=numpy.double)
 parm_names = list(eb.parnames)
 parm_texsym = list(eb.partexsym)
 parm_units = list(eb.parunits)
 
-PAR_GAMMA = eb.NPAR
-parm_names.append("gamma")
-parm_texsym.append("\\gamma")
+npar = eb.NPAR
+
+PAR_GAMMA1 = npar
+npar += 1
+
+if mode_g:
+  parm_names.append("gamma1")
+  parm_texsym.append("\\gamma_1")
+else:
+  parm_names.append("gamma")
+  parm_texsym.append("\\gamma")
+
 parm_units.append("km/s")
 
-PAR_KTOT = eb.NPAR+1
+if mode_g:
+  PAR_GAMMA2 = npar
+  npar += 1
+
+  parm_names.append("gamma2")
+  parm_texsym.append("\\gamma_2")
+  parm_units.append("km/s")
+else:
+  PAR_GAMMA2 = None
+
+PAR_KTOT = npar
+npar += 1
+
 parm_names.append("K1+K2")
 parm_texsym.append("(K_1+K_2)")
 parm_units.append("km/s")
 
-PAR_S1 = eb.NPAR+2
+PAR_S1 = npar
+npar += 1
 
 if mode_s:
   parm_names.append("sigma1")
@@ -105,7 +131,9 @@ else:
 parm_units.append("km/s")
 
 if mode_s:
-  PAR_S2 = eb.NPAR+3
+  PAR_S2 = npar
+  npar += 1
+
   parm_names.append("sigma2")
   parm_texsym.append("\\sigma_2")
   parm_units.append("km/s")
@@ -239,7 +267,12 @@ def fit_func (trial, ymod):
   ymod *= ourparm[PAR_KTOT] / (1.0 + ourparm[eb.PAR_Q])
   ymod[0:nobs] *= ourparm[eb.PAR_Q]
   ymod[nobs:2*nobs] *= -1
-  ymod += ourparm[PAR_GAMMA]
+
+  if mode_g:
+    ymod[0:nobs] += ourparm[PAR_GAMMA1]
+    ymod[nobs:2*nobs] += ourparm[PAR_GAMMA2]
+  else:
+    ymod += ourparm[PAR_GAMMA1]
 
 def vecok (ourparm):
   ecc = math.hypot(ourparm[eb.PAR_ECOSW], ourparm[eb.PAR_ESINW])
@@ -263,7 +296,12 @@ def logpost (trial, x, y, yerr):
   ymod *= ourparm[PAR_KTOT] / (1.0 + ourparm[eb.PAR_Q])
   ymod[0:nobs] *= ourparm[eb.PAR_Q]
   ymod[nobs:2*nobs] *= -1
-  ymod += ourparm[PAR_GAMMA]
+
+  if mode_g:
+    ymod[0:nobs] += ourparm[PAR_GAMMA1]
+    ymod[nobs:2*nobs] += ourparm[PAR_GAMMA2]
+  else:
+    ymod += ourparm[PAR_GAMMA1]
   
   wt = numpy.empty_like(ymod)
   wt[0:nobs] = (hh / ourparm[PAR_S1])**2
@@ -339,7 +377,9 @@ if args.m is not None:
     jparm = plist[iparm]
 
     if fixed[iparm]:
-      if jparm == PAR_GAMMA or jparm == PAR_KTOT:
+      if jparm == PAR_GAMMA1 or jparm == PAR_KTOT:
+        pert[iparm] = 1.0
+      elif mode_g and jparm == PAR_GAMMA2:
         pert[iparm] = 1.0
       elif jparm == PAR_S1:
         pert[iparm] = 0.1 * errguess1
@@ -521,7 +561,7 @@ if args.m is not None:
     thissamp = ch[isamp]
     parm[plist] = thissamp
 
-    thisvder = eb.getvder(parm, parm[PAR_GAMMA], parm[PAR_KTOT])
+    thisvder = eb.getvder(parm, parm[PAR_GAMMA1], parm[PAR_KTOT])
 
     # Change units of semimajor axis from Rsol to AU for consistency
     # with SB1 program outputs.
@@ -674,11 +714,14 @@ else:
 
 typplot.fill(eb.OBS_VRAD1)
 yplot1 = eb.model(parm, phiplot, typplot, eb.FLAG_PHI)
-yplot1 = parm[PAR_GAMMA] + yplot1 * parm[PAR_KTOT] * parm[eb.PAR_Q] / (1.0 + parm[eb.PAR_Q])
+yplot1 = parm[PAR_GAMMA1] + yplot1 * parm[PAR_KTOT] * parm[eb.PAR_Q] / (1.0 + parm[eb.PAR_Q])
 
 typplot.fill(eb.OBS_VRAD2)
 yplot2 = eb.model(parm, phiplot, typplot, eb.FLAG_PHI)
-yplot2 = parm[PAR_GAMMA] - yplot2 * parm[PAR_KTOT] / (1.0 + parm[eb.PAR_Q])
+if mode_g:
+  yplot2 = parm[PAR_GAMMA2] - yplot2 * parm[PAR_KTOT] / (1.0 + parm[eb.PAR_Q])
+else:
+  yplot2 = parm[PAR_GAMMA1] - yplot2 * parm[PAR_KTOT] / (1.0 + parm[eb.PAR_Q])
 
 fig = plt.figure(figsize=figsize)
 
