@@ -26,7 +26,6 @@ ap.add_argument("-3", action="store_true", dest="triple", help="read and plot th
 ap.add_argument("-b", type=int, help="set number of burn-in samples")
 ap.add_argument("-m", help="run MCMC storing output to file M")
 ap.add_argument("-n", type=int, help="set number of MCMC samples to N")
-ap.add_argument("-s", action="store_true", help="fit separate sigmas for each star")
 ap.add_argument("-u", action="store_true", help="plot unfolded phase")
 ap.add_argument("-w", type=int, help="set number of walkers")
 args = ap.parse_args()
@@ -48,8 +47,38 @@ import matplotlib.pyplot as plt
 # Fixed random number seed to make results reproducible.
 numpy.random.seed(42)
 
+# Read input file.
+pset_names = {}
+pset_lines = []
+
+with open(args.pset, "r") as fp:
+  for line in fp:
+    # Remove comments and trim white space.
+    ll = line.split("#", 2)
+    ls = ll[0].strip()
+
+    if ls == "":
+      continue
+
+    # Now split into fields.
+    ll = ls.split()
+    if len(ll) < 3:
+      print >>sys.stderr, "could not understand:", line
+      sys.exit(1)
+
+    name = ll[0]
+    pset_names[name] = ll
+
+    pset_lines.append(ll)
+
+# Detect options.
+mode_s = 0
+
+if "sigma1" in pset_names and "sigma2" in pset_names:
+  mode_s = 1
+
 # Build main parameter vector and metadata vectors.
-parm = numpy.zeros(eb.NPAR+3+args.s, dtype=numpy.double)
+parm = numpy.zeros(eb.NPAR+3+mode_s, dtype=numpy.double)
 parm_names = list(eb.parnames)
 parm_texsym = list(eb.partexsym)
 parm_units = list(eb.parunits)
@@ -66,7 +95,7 @@ parm_units.append("km/s")
 
 PAR_S1 = eb.NPAR+2
 
-if args.s:
+if mode_s:
   parm_names.append("sigma1")
   parm_texsym.append("\\sigma_1")
 else:
@@ -75,7 +104,7 @@ else:
 
 parm_units.append("km/s")
 
-if args.s:
+if mode_s:
   PAR_S2 = eb.NPAR+3
   parm_names.append("sigma2")
   parm_texsym.append("\\sigma_2")
@@ -98,7 +127,7 @@ parm[eb.PAR_RR]    =   0.001  # dummy value
 # Supply a default for error scaling parameter(s).
 parm[PAR_S1]       =   0.15   # km/s
 
-if args.s:
+if mode_s:
   parm[PAR_S2] = parm[PAR_S1]
 
 # Load data.
@@ -133,54 +162,43 @@ plist_texsym = []
 plist_units = []
 fixed = []
 
-with open(args.pset, "r") as fp:
-  for line in fp:
-    # Remove comments and trim white space.
-    ll = line.split("#", 2)
-    ls = ll[0].strip()
+for ll in pset_lines:
+  name = ll[0]
+  value = float(ll[1])
+  vary = int(ll[2])
 
-    # Now split into fields.
-    ll = ls.split()
-    if len(ll) < 3:
-      print >>sys.stderr, "could not understand:", line
-      sys.exit(1)
+  if len(ll) > 3:
+    sigma = float(ll[3])
+  else:
+    sigma = None
 
-    name = ll[0]
-    value = float(ll[1])
-    vary = int(ll[2])
+  if name in name2iparm:
+    iparm = name2iparm[name]
 
-    if len(ll) > 3:
-      sigma = float(ll[3])
+    # Set value.
+    if iparm == eb.PAR_T0:
+      parm[iparm] = value - tbase
     else:
-      sigma = None
+      parm[iparm] = value
 
-    if name in name2iparm:
-      iparm = name2iparm[name]
+    # Add to parameter list if we're varying.
+    if vary > 0:
+      plist.append(iparm)
+      plist_names.append(name)
+      plist_texsym.append(parm_texsym[iparm])
+      plist_units.append(parm_units[iparm])
 
-      # Set value.
-      if iparm == eb.PAR_T0:
-        parm[iparm] = value - tbase
+      if vary == 1:  # 1=in LM and MC, 2=in MC only
+        fixed.append(False)
+      elif vary == 2:
+        fixed.append(True)
       else:
-        parm[iparm] = value
+        print >>sys.stderr, "unknown vary value:", vary
+        sys.exit(1)
 
-      # Add to parameter list if we're varying.
-      if vary > 0:
-        plist.append(iparm)
-        plist_names.append(name)
-        plist_texsym.append(parm_texsym[iparm])
-        plist_units.append(parm_units[iparm])
-
-        if vary == 1:  # 1=in LM and MC, 2=in MC only
-          fixed.append(False)
-        elif vary == 2:
-          fixed.append(True)
-        else:
-          print >>sys.stderr, "unknown vary value:", vary
-          sys.exit(1)
-
-    else:
-      print >>sys.stderr, "unknown parameter:", name
-      sys.exit(1)
+  else:
+    print >>sys.stderr, "unknown parameter:", name
+    sys.exit(1)
 
 # Convert these to numpy arrays.
 plist = numpy.array(plist, dtype=numpy.int)
@@ -189,7 +207,7 @@ fixed = numpy.array(fixed, dtype=numpy.bool)
 # Store this for later.
 errguess1 = parm[PAR_S1]
 
-if args.s:
+if mode_s:
   errguess2 = parm[PAR_S2]
 else:
   errguess2 = errguess1
@@ -227,7 +245,7 @@ def vecok (ourparm):
   ecc = math.hypot(ourparm[eb.PAR_ECOSW], ourparm[eb.PAR_ESINW])
   return(ecc < 1.0 and
          ourparm[PAR_S1] > 0 and
-         (not args.s or ourparm[PAR_S2] > 0))
+         (not mode_s or ourparm[PAR_S2] > 0))
 
 # Function returning log of posterior probability for MCMC.
 def logpost (trial, x, y, yerr):
@@ -250,7 +268,7 @@ def logpost (trial, x, y, yerr):
   wt = numpy.empty_like(ymod)
   wt[0:nobs] = (hh / ourparm[PAR_S1])**2
 
-  if args.s:
+  if mode_s:
     wt[nobs:2*nobs] = (hh / ourparm[PAR_S2])**2
   else:
     wt[nobs:2*nobs] = (hh / ourparm[PAR_S1])**2
@@ -260,7 +278,7 @@ def logpost (trial, x, y, yerr):
   # Prior: Modified Jeffreys on error scale parameter.
   logprior = numpy.log(ourparm[PAR_S1] + 0.1*errguess1)
 
-  if args.s:
+  if mode_s:
     logprior += numpy.log(ourparm[PAR_S2] + 0.1*errguess2)
 
   # Convert to uniform prior in eccentricity.
@@ -325,7 +343,7 @@ if args.m is not None:
         pert[iparm] = 1.0
       elif jparm == PAR_S1:
         pert[iparm] = 0.1 * errguess1
-      elif args.s and jparm == PAR_S2:
+      elif mode_s and jparm == PAR_S2:
         pert[iparm] = 0.1 * errguess2
       else:
         pert[iparm] = 0.01
@@ -614,7 +632,7 @@ if args.m is not None:
 
   ndof = vfit.size - vmed.size
 
-  if args.s:
+  if mode_s:
     print "Median rms(1) =", numpy.median(parm[PAR_S1]/hh), "km/s"
     print "Median rms(2) =", numpy.median(parm[PAR_S2]/hh), "km/s"
   else:
@@ -649,7 +667,7 @@ typplot = numpy.empty_like(phiplot, dtype=numpy.uint8)
 
 e_vfit[0:nobs] = parm[PAR_S1] / hh
 
-if args.s:
+if mode_s:
   e_vfit[nobs:2*nobs] = parm[PAR_S2] / hh
 else:
   e_vfit[nobs:2*nobs] = parm[PAR_S1] / hh
@@ -675,7 +693,7 @@ if args.triple:
 
   print "gamma3 =", mean3, "km/s"
 
-  if args.s:
+  if mode_s:
     tmp = resid3 * hh
     chisq = numpy.sum(tmp*tmp)
     err3 = math.sqrt(chisq / (hh.size-1))
