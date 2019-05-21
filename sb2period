@@ -29,7 +29,7 @@ for ilc, lcfile in enumerate(filelist):
                           loose=False)
 
   # Make sure sorted on time.
-  numpy.sort(vels, order="bjd")
+  vels = numpy.sort(vels, order="bjd")
 
   # This is Ktot * vrad function, gamma cancels out.
   y = vels["v1"] - vels["v2"]

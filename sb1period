@@ -35,7 +35,7 @@ for ilc, lcfile in enumerate(filelist):
                             loose=False)
 
   # Make sure sorted on time.
-  numpy.sort(vels, order="bjd")
+  vels = numpy.sort(vels, order="bjd")
 
   y = vels["v"]
   wt = vels["h"]**2
