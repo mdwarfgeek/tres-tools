@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 
 argc = len(sys.argv)
 
+# Figure size based on pgplot.
+figsize = (10.5, 7.8)  # inches
+
 if argc < 3:
   print "Usage:\t", sys.argv[0], "dvelfile [...] pmin pmax"
   sys.exit(1)
@@ -96,6 +99,8 @@ v = numpy.linspace(pl, ph, nn)
 v *= vsamp
 
 # Plots.
+fig = plt.figure(figsize=figsize)
+
 npanel = 2*len(buf)+2
 
 for ilc, lc in enumerate(buf):
@@ -126,7 +131,7 @@ for ilc, lc in enumerate(buf):
     # "Corrected" y array
     ycorr = y
 
-    plt.subplot(npanel, 1, 2*ilc+1)
+    axf = plt.subplot(npanel, 1, 2*ilc+1)
 #    plt.axis([t[0], t[-1], numpy.max(ycorr), numpy.min(ycorr)])
 
     plt.plot(t, ycorr, ".", color="black")
@@ -150,7 +155,7 @@ for ilc, lc in enumerate(buf):
     plt.ylabel("$\\Delta$v (km/s)")
     plt.xlabel("Time from start (days)")
 
-    plt.subplot(npanel, 1, 2*ilc+2)
+    plt.subplot(npanel, 1, 2*ilc+2, sharey=axf)
 #    plt.axis([0.0, 1.0, numpy.max(ycorr), numpy.min(ycorr)])
 
     phase = numpy.fmod(vbest*t, 1.0)

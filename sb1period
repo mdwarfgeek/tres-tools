@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 
 argc = len(sys.argv)
 
+# Figure size based on pgplot.
+figsize = (10.5, 7.8)  # inches
+
 if argc < 3:
   print "Usage:\t", sys.argv[0], "velfile [...] pmin pmax"
   sys.exit(1)
@@ -104,6 +107,8 @@ v = numpy.linspace(pl, ph, nn)
 v *= vsamp
 
 # Plots.
+fig = plt.figure(figsize=figsize)
+
 npanel = 2*len(buf)+2
 
 for ilc, lc in enumerate(buf):
@@ -135,7 +140,7 @@ for ilc, lc in enumerate(buf):
 
     print "gamma =", bdc[0], "km/s"
 
-    plt.subplot(npanel, 1, 2*ilc+1)
+    axf = plt.subplot(npanel, 1, 2*ilc+1)
 #    plt.axis([t[0], t[-1], numpy.max(ycorr), numpy.min(ycorr)])
 
     plt.plot(t, y, ".", color="black")
@@ -159,7 +164,7 @@ for ilc, lc in enumerate(buf):
     plt.ylabel("vrad (km/s)")
     plt.xlabel("Time from start (days)")
 
-    plt.subplot(npanel, 1, 2*ilc+2)
+    plt.subplot(npanel, 1, 2*ilc+2, sharey=axf)
 #    plt.axis([0.0, 1.0, numpy.max(y), numpy.min(y)])
 
     phase = numpy.fmod(vbest*t, 1.0)
