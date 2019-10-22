@@ -1,6 +1,7 @@
 import numpy
 import os
 import string
+import warnings
 
 import fitsio
 import lfa
@@ -120,9 +121,10 @@ class read_spec:
 
     if istmpl:
       if not "VELOCITY" in hdr:
-        raise RuntimeError("please set velocity for template")
-        
-      vrad = float(hdr["VELOCITY"])
+        warnings.warn("assuming template velocity = 0")
+        vrad = 0
+      else:
+        vrad = float(hdr["VELOCITY"])
     else:
       vrad = 0.0
 
