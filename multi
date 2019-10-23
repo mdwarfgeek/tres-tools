@@ -1,0 +1,231 @@
+#!/usr/bin/env python
+
+import argparse
+import math
+import os
+import re
+import sys
+
+import numpy
+
+import lfa
+
+# Stop pyplot trying to use X.
+import matplotlib
+matplotlib.use('Agg')
+
+import fftrv
+
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
+
+from scipy.interpolate import InterpolatedUnivariateSpline
+
+from medsig import *
+
+from makesky import *
+from prepord import *
+from read_spec import *
+
+# Constants used by the script go here.
+
+# Figure size based on pgplot.
+figsize = (10.5, 7.8)  # inches
+
+# Velocity range to plot
+velrange = 150  # km/s, plots +/- this much
+
+# Limb darkening coefficients for rotational broadening kernel.
+# These are from Phoenix mod. atm. for Teff=3224K, logg=5, Rc band,
+# least-squares method, Claret et al. (2012) 2012A&A...546A..14C
+ald = 0.4629
+bld = 0.3212
+
+def calcq(wave, flux, mask, vsini):
+  npix = len(flux)
+  
+  # Central wavelength and interval.
+  cenwave = wave[npix//2]
+  dlam = wave[npix//2] - wave[npix//2-1]
+
+  # Rotational broadening kernel extent in wavelength.
+  lmax = cenwave * vsini*1000 / lfa.LIGHT
+
+  # Extent in pixels.
+  rimax = lmax / dlam
+
+  # Pixel range to compute over.
+  imax = int(rimax)
+  
+  if imax > 0:
+    # Generate kernel.
+    i = numpy.arange(-imax, imax+1)
+    y = 1.0 - (i / rimax)**2
+
+    norm = 1.0 / (math.pi * rimax * (1.0 - ald/3.0 - bld/6.0))
+    a = 2.0 * (1.0 - ald - bld) * norm
+    b = 0.5*math.pi * (ald + 2*bld) * norm
+    c = 4.0 * bld * norm / 3.0
+    
+    K = (a - c*y) * numpy.sqrt(y) + b*y
+
+    flux = numpy.convolve(flux, K, mode="valid")
+    wave = wave[imax:npix-imax]
+    mask = mask[imax:npix-imax]
+
+    npix = len(flux)
+
+  # Q of template following Bouchy et al. (2001).
+  ww = numpy.logical_and(mask, flux > 0)
+  
+  fnorm = flux / numpy.mean(flux[ww])
+  d = (fnorm[1:npix] - fnorm[0:npix-1]) / (wave[1:npix] - wave[0:npix-1])
+  m = (wave[1:npix] / fnorm[1:npix]) * d
+  qvec = fnorm[1:npix] * m*m
+  
+  ww = numpy.logical_and(numpy.logical_and(mask[1:npix], mask[0:npix-1]),
+                         numpy.logical_and(flux[1:npix] > 0, flux[0:npix-1] > 0))
+  
+  q = math.sqrt(numpy.mean(qvec[ww]))
+
+  return q
+
+def do_multi_vrad(pdf, tmplname, filename,
+                  tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
+                  mbjd, wave, flux, e_flux, msk,
+                  orders, vsini=0, emchop=True):
+  l_vrad = numpy.empty_like(orders, dtype=numpy.double)
+  l_e_vrad = numpy.empty_like(orders, dtype=numpy.double)
+  l_corr = numpy.empty_like(orders, dtype=numpy.double)
+
+  for ii, order in enumerate(orders):
+    # Extract order and clean.
+    thistmpl_wave, thistmpl_flux, thistmpl_e_flux = prepord(order, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk)
+    thiswave, thisflux, thise_flux = prepord(order, wave, flux, e_flux, msk)
+
+    tmpl_emmask = numpy.isfinite(thistmpl_flux)
+    emmask = numpy.isfinite(thisflux)
+    
+    if emchop:
+      medflux, sigflux = medsig(thistmpl_flux[tmpl_emmask])
+      tmpl_emmask = numpy.logical_and(tmpl_emmask,
+                                      thistmpl_flux < medflux + 5.0*sigflux)
+      
+      medflux, sigflux = medsig(thisflux[emmask])
+      emmask = numpy.logical_and(emmask,
+                                 thisflux < medflux + 5.0*sigflux)
+
+    # Calculate Q from template.
+    q = calcq(thistmpl_wave, thistmpl_flux, tmpl_emmask, vsini)
+
+    # Estimate of velocity uncertainty using target spectrum SNR.
+    ww = numpy.logical_and(emmask, thise_flux > 0)
+    snr = thisflux[ww] / thise_flux[ww]
+
+    velrms = lfa.LIGHT / (1000 * q * math.sqrt(numpy.sum(snr*snr)))
+
+    # Take off sky.
+    ss = makesky(thistmpl_wave, thistmpl_flux, 4)
+    
+    thistmpl_flux -= ss
+    
+    ss = makesky(thiswave, thisflux, 4)
+    
+    thisflux -= ss
+
+    # Number of measurements (pixels).
+    npix = len(thisflux)
+
+    # Correlate.
+    frv = fftrv.fftrv(nbin=32*npix, t_emchop=emchop, s_emchop=emchop)
+
+    z, corr, zbest, hbest, sigt = frv.correlate(thistmpl_wave, thistmpl_flux,
+                                                thiswave, thisflux,
+                                                vsini*1000 / lfa.LIGHT,
+                                                ald, bld)
+
+    vels = z * lfa.LIGHT / 1000
+    vbest = zbest * lfa.LIGHT / 1000
+
+    l_vrad[ii] = vbest
+    l_e_vrad[ii] = velrms
+    l_corr[ii] = hbest
+
+  nord = len(l_vrad)
+
+  # Mean of orders, unweighted.
+  mean_vrad = numpy.mean(l_vrad)
+  sig_vrad = numpy.std(l_vrad)
+
+  e_mean_vrad = math.sqrt(numpy.sum(l_e_vrad*l_e_vrad)) / nord
+
+  # Mean of orders, weighted by uncertainties.
+  wt = 1.0 / (l_e_vrad*l_e_vrad)
+  swt = numpy.sum(wt)
+
+  wt_mean_vrad = numpy.sum(l_vrad * wt) / swt
+  wt_e_mean_vrad = 1.0 / math.sqrt(swt)
+
+  return wt_mean_vrad, wt_e_mean_vrad, l_vrad, l_e_vrad, l_corr
+
+ap = argparse.ArgumentParser()
+ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
+ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
+ap.add_argument("-c", metavar="ra dec pmra pmdec plx vrad epoch", type=str, help="specify catalogue information for target")
+ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
+ap.add_argument("-o", type=int, help="override order number used for analysis")
+ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
+ap.add_argument("-r", metavar="vsini", type=float, help="use fixed rotation for  final velocity analysis")
+args = ap.parse_args()
+
+# New read_spec structure.
+rs = read_spec()
+
+if args.o is not None:
+  rs.overrideorder = args.o
+
+emchop = not args.E
+usevsini = 0
+if args.r is not None:
+  usevsini = args.r
+
+# Read template.
+tmplsp = rs.read_spec(args.template, istmpl=1, wantstruct=True, doreject=not args.R)
+
+tmplname = stripname(args.template)
+
+filelist = args.filelist
+nf = len(args.filelist)
+
+for ifile, filename in enumerate(filelist):
+  sp = rs.read_spec(filename, src_str=args.c, wantstruct=True, doreject=not args.R)
+
+  targname = re.sub(r'_cb\.spec$', "", stripname(filename))
+
+  basefile = stripname(filename)
+  outfile = basefile + "_multi.pdf"
+
+#  pdf = PdfPages(outfile)
+  pdf = None
+
+  # Velocity.
+  multiorders = rs.multiorder
+  if args.o is not None:
+    multiorders = [ args.o ]
+
+  mean_vrad, e_mean_vrad, l_vrad, l_e_vrad, l_corr = do_multi_vrad(pdf, tmplname, targname,
+                                                                   tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
+                                                                   sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
+                                                                   orders=multiorders, vsini=usevsini, emchop=emchop)
+
+#  pdf.close()
+
+  print "{0:s} {1:12.4f} {2:9.4f} {3:7.4f} {4:7.2f} {5:5.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vrad, e_mean_vrad, sp.exptime, usevsini),
+
+  for iord in range(len(l_vrad)):
+    print " {0:2d} {1:9.4f} {2:7.4f} {3:8.6f}".format(multiorders[iord], l_vrad[iord], l_e_vrad[iord], l_corr[iord]),
+
+  print
+
+sys.exit(0)
+
