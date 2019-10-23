@@ -226,6 +226,7 @@ ap.add_argument("--alim", type=get_range, default=[-velrange, velrange], help="s
 ap.add_argument("--blim", type=get_range, default=[-velrange, velrange], help="set velocity range star 2 --blim='min:max', default {0:d} to {1:d}".format(-velrange, velrange))
 ap.add_argument("--clim", type=get_range, default=[-velrange, velrange], help="set velocity range star 3 --clim='min:max', default {0:d} to {1:d}".format(-velrange, velrange))
 ap.add_argument("-a", help="automatically optimize parameters par1,par2,...")
+ap.add_argument("-c", metavar="ra dec pmra pmdec plx vrad epoch", type=str, help="specify catalogue information for target")
 ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-p", action='store_true', help="save plots of 3-D correlation function")
@@ -263,7 +264,7 @@ nf = len(args.filelist)
 # Read targets.
 targlist = [None] * nf
 for ifile, filename in enumerate(filelist):
-  targlist[ifile] = rs.read_spec(filename, wantstruct=True, doreject=not args.R)
+  targlist[ifile] = rs.read_spec(filename, src_str=args.c, wantstruct=True, doreject=not args.R)
 
 minvela, maxvela = args.alim
 minvelb, maxvelb = args.blim

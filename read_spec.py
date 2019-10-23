@@ -37,7 +37,7 @@ class read_spec:
     self.multiorder = None
     self.overrideorder = None
 
-  def read_spec(self, filespec, istmpl=False, wantstruct=False, doreject=True):
+  def read_spec(self, filespec, src=None, src_str=None, istmpl=False, wantstruct=False, doreject=True):
     # Convert file specification from script argument into a file list.
     # The string "filespec" can be a single item or comma-separated
     # list of items.  Each item can be a filename or @list to read an
@@ -56,6 +56,53 @@ class read_spec:
         filelist.append(thisspec)
 
     nspec = len(filelist)
+
+    # Extract source structure from catalogue information, if given.
+    if src is None and src_str is not None:
+      # Convert RA, DEC.  Try : first and then space.
+      ss = src_str
+
+      ra, rv = lfa.base60_to_10(ss, ':', lfa.UNIT_HR, lfa.UNIT_RAD)
+      if rv < 0:
+        ra, rv = lfa.base60_to_10(ss, ' ', lfa.UNIT_HR, lfa.UNIT_RAD)
+        if rv < 0:
+          raise RuntimeError("could not understand radec: " + src_str)
+        else:
+          ss = ss[rv:]
+          de, rv = lfa.base60_to_10(ss, ' ', lfa.UNIT_DEG, lfa.UNIT_RAD)
+          if rv < 0:
+            raise RuntimeError("could not understand radec: " + src_str)
+          else:
+            ss = ss[rv:]
+      else:
+        ss = ss[rv:]
+        de, rv = lfa.base60_to_10(ss, ':', lfa.UNIT_DEG, lfa.UNIT_RAD)
+        if rv < 0:
+          raise RuntimeError("could not understand radec: " + src_str)
+        else:
+          ss = ss[rv:]
+
+      # Attempt to split the rest.
+      ll = ss.strip().split()
+
+      pmra = 0
+      pmde = 0
+      plx = 0
+      cat_vrad = 0
+      cat_epoch = 2000.0
+
+      if len(ll) > 0:
+        pmra = float(ll[0])
+      if len(ll) > 1:
+        pmde = float(ll[1])
+      if len(ll) > 2:
+        plx = float(ll[2])
+      if len(ll) > 3:
+        cat_vrad = float(ll[3])
+      if len(ll) > 4:
+        cat_epoch = float(ll[4])
+
+      src = lfa.source(ra, de, pmra, pmde, plx, cat_vrad, cat_epoch)
 
     # Use first file for setup.
     fp = fitsio.FITS(filelist[0], 'r')
@@ -128,7 +175,7 @@ class read_spec:
     else:
       vrad = 0.0
 
-    mbjd, zb, exptime, wave, flux, e_flux, blaze = self.read(fp, self.obs)
+    mbjd, zb, exptime, wave, flux, e_flux, blaze = self.read(fp, self.obs, src)
 
     if nspec > 1:
       # Init lists, using the one we already have (reference).
@@ -160,7 +207,7 @@ class read_spec:
       # Read all spectra and interpolate.
       # XXX - blaze currently ignored.
       for i, filename in enumerate(filelist[1:]):
-        thismbjd, thiszb, thisexptime, thiswave, thisflux, thise_flux, thisblaze = self.read(filename, self.obs)
+        thismbjd, thiszb, thisexptime, thiswave, thisflux, thise_flux, thisblaze = self.read(filename, self.obs, src)
 
         mbjdlist[i+1] = thismbjd
         zblist[i+1] = thiszb
