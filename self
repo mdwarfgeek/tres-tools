@@ -274,7 +274,7 @@ def do_multi_vrad(pdf, tmplname, filename,
     pdf.savefig(fig)
     plt.close()
 
-  return mean_vrad, e_mean_vrad
+  return mean_vrad, e_mean_vrad, l_vrad, l_corr
 
 ap = argparse.ArgumentParser()
 ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
@@ -345,10 +345,10 @@ if nspec > 2 and not args.S:
     for ifile, filename in enumerate(filelist):
       sp = speclist[ifile+1]
 
-      mean_vrad, e_mean_vrad = do_multi_vrad(None, None, None,
-                                             tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
-                                             sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
-                                             orders=multiorders, emchop=emchop)
+      mean_vrad, e_mean_vrad, l_vrad, l_corr = do_multi_vrad(None, None, None,
+                                                             tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
+                                                             sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
+                                                             orders=multiorders, emchop=emchop)
 
       restwave = sp.wave / (1.0 + mean_vrad * 1000 / lfa.LIGHT)
 
@@ -447,14 +447,19 @@ for ispec, sp in enumerate(speclist):
          vrad,
          orders=multiorders, emchop=emchop)
 
-  mean_vrad, e_mean_vrad = do_multi_vrad(pdf, tmplname, targname,
-                                         tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
-                                         sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
-                                         orders=multiorders, emchop=emchop)
+  mean_vrad, e_mean_vrad, l_vrad, l_corr = do_multi_vrad(pdf, tmplname, targname,
+                                                         tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
+                                                         sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
+                                                         orders=multiorders, emchop=emchop)
 
   pdf.close()
 
-  print "{0:s} {1:12.4f} {2:9.4f} {3:7.4f} {4:7.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vrad, e_mean_vrad, sp.exptime)
+  print "{0:s} {1:12.4f} {2:9.4f} {3:7.4f} {4:7.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vrad, e_mean_vrad, sp.exptime),
+
+  for iord in range(len(l_vrad)):
+    print " {0:2d} {1:9.4f} {2:8.6f}".format(multiorders[iord], l_vrad[iord], l_corr[iord]),
+
+  print
 
 sys.exit(0)
 
