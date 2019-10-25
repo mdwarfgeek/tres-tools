@@ -85,73 +85,74 @@ def do_vrad(pdf, tmplname, filename,
   vels = z * lfa.LIGHT / 1000
   vbest = zbest * lfa.LIGHT / 1000
 
-  ww = numpy.abs(vels-vbest) < velrange
+  if pdf is not None:
+    ww = numpy.abs(vels-vbest) < velrange
 
-  fig = plt.figure(figsize=figsize)
+    fig = plt.figure(figsize=figsize)
 
-  yofftarg = max(thistmpl_rawflux[tmpl_emmask])
+    yofftarg = max(thistmpl_rawflux[tmpl_emmask])
 
-  plt.subplot(2, 1, 1)
-  plt.plot(thistmpl_wave, thistmpl_rawflux)
-  plt.plot(thiswave, thisrawflux+yofftarg)
-  plt.xlim(thiswave[0], thiswave[-1])
+    plt.subplot(2, 1, 1)
+    plt.plot(thistmpl_wave, thistmpl_rawflux)
+    plt.plot(thiswave, thisrawflux+yofftarg)
+    plt.xlim(thiswave[0], thiswave[-1])
 
-  yl = numpy.min(thistmpl_rawflux[tmpl_emmask])
-  yh = numpy.max(thisrawflux[emmask]) + yofftarg
-  plt.ylim(yl-0.05*(yh-yl), yh+0.05*(yh-yl))
+    yl = numpy.min(thistmpl_rawflux[tmpl_emmask])
+    yh = numpy.max(thisrawflux[emmask]) + yofftarg
+    plt.ylim(yl-0.05*(yh-yl), yh+0.05*(yh-yl))
 
-  plt.xlabel("Wavelength (A)")
-  plt.ylabel("Counts")
-  plt.title("Aperture {0:d}".format(order))
-  
-  xl, xh = plt.xlim()
-  yl, yh = plt.ylim()
+    plt.xlabel("Wavelength (A)")
+    plt.ylabel("Counts")
+    plt.title("Aperture {0:d}".format(order))
 
-  levmin = xh - 0.25*(xh-xl)
-  levmax = xh
+    xl, xh = plt.xlim()
+    yl, yh = plt.ylim()
 
-  wwlev = numpy.logical_and(thistmpl_wave >= levmin,
-                            thistmpl_wave <= levmax)
-  wwlev = numpy.logical_and(wwlev, tmpl_emmask)
+    levmin = xh - 0.25*(xh-xl)
+    levmax = xh
 
-  ytmplmed, ytmplsig = medsig(thistmpl_rawflux[wwlev])
-  ytmpl = ytmplmed+3*ytmplsig
+    wwlev = numpy.logical_and(thistmpl_wave >= levmin,
+                              thistmpl_wave <= levmax)
+    wwlev = numpy.logical_and(wwlev, tmpl_emmask)
 
-  wwlev = numpy.logical_and(thiswave >= levmin,
-                            thiswave <= levmax)
-  wwlev = numpy.logical_and(wwlev, emmask)
+    ytmplmed, ytmplsig = medsig(thistmpl_rawflux[wwlev])
+    ytmpl = ytmplmed+3*ytmplsig
 
-  ytargmed, ytargsig = medsig(thisrawflux[wwlev])
-  ytarg = ytargmed+3*ytargsig
+    wwlev = numpy.logical_and(thiswave >= levmin,
+                              thiswave <= levmax)
+    wwlev = numpy.logical_and(wwlev, emmask)
 
-  plt.text(xh-0.02*(xh-xl), ytmpl+0.02*(yh-yl),
-           tmplname,
-           horizontalalignment='right', size='small')
+    ytargmed, ytargsig = medsig(thisrawflux[wwlev])
+    ytarg = ytargmed+3*ytargsig
 
-  plt.text(xh-0.02*(xh-xl), yofftarg+ytarg+0.02*(yh-yl),
-           filename,
-           horizontalalignment='right', size='small')
+    plt.text(xh-0.02*(xh-xl), ytmpl+0.02*(yh-yl),
+             tmplname,
+             horizontalalignment='right', size='small')
 
-  plt.subplot(2, 1, 2)
-  plt.plot(vels[ww], corr[ww])
-  plt.xlim(vels[ww][0], vels[ww][-1])
-  plt.xlabel("Velocity (km/s)")
-  plt.ylabel("Correlation")
-  
-  xl, xh = plt.xlim()
-  yl, yh = plt.ylim()
-  
-  plt.text(xh-0.02*(xh-xl), yh-0.1*(yh-yl),
-             "Delta RV = {0:.3f} km/s".format(vbest),
+    plt.text(xh-0.02*(xh-xl), yofftarg+ytarg+0.02*(yh-yl),
+             filename,
+             horizontalalignment='right', size='small')
+
+    plt.subplot(2, 1, 2)
+    plt.plot(vels[ww], corr[ww])
+    plt.xlim(vels[ww][0], vels[ww][-1])
+    plt.xlabel("Velocity (km/s)")
+    plt.ylabel("Correlation")
+
+    xl, xh = plt.xlim()
+    yl, yh = plt.ylim()
+
+    plt.text(xh-0.02*(xh-xl), yh-0.1*(yh-yl),
+               "Delta RV = {0:.3f} km/s".format(vbest),
+               horizontalalignment='right')
+    plt.text(xh-0.02*(xh-xl), yh-0.2*(yh-yl),
+             "h = {0:.3f}".format(hbest),
              horizontalalignment='right')
-  plt.text(xh-0.02*(xh-xl), yh-0.2*(yh-yl),
-           "h = {0:.3f}".format(hbest),
-           horizontalalignment='right')
 
-  plt.axvline(vbest)
-  
-  pdf.savefig(fig)
-  plt.close()
+    plt.axvline(vbest)
+
+    pdf.savefig(fig)
+    plt.close()
 
   return vbest, hbest
 
@@ -179,19 +180,20 @@ def do_lsd(pdf, filename,
       for imeas, thisvel in enumerate(vels):
         lfp.write(str(thisvel) + " " + str(prof[imeas]) + "\n")
 
-  # Plot.
-  fig = plt.figure(figsize=figsize)
+  if pdf is not None:
+    # Plot.
+    fig = plt.figure(figsize=figsize)
 
-  plt.plot(vels, prof)
+    plt.plot(vels, prof)
 
-  plt.xlim(vels[0], vels[-1])
+    plt.xlim(vels[0], vels[-1])
 
-  plt.xlabel("Velocity (km/s)".format(vrad))
-  plt.ylabel("Normalized flux")
-  plt.title("{0:s} differential LSD".format(filename))
+    plt.xlabel("Velocity (km/s)".format(vrad))
+    plt.ylabel("Normalized flux")
+    plt.title("{0:s} differential LSD".format(filename))
 
-  pdf.savefig(fig)
-  plt.close()
+    pdf.savefig(fig)
+    plt.close()
 
 def do_multi_vrad(pdf, tmplname, filename,
                   tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
@@ -237,39 +239,40 @@ def do_multi_vrad(pdf, tmplname, filename,
   else:
     e_mean_vrad = 0
 
-  fig = plt.figure(figsize=figsize)
+  if pdf is not None:
+    fig = plt.figure(figsize=figsize)
 
-  plt.subplot(2, 1, 1)
+    plt.subplot(2, 1, 1)
 
-  plt.xlim(orders[0]-1, orders[-1]+1)
-  plt.fill_between(plt.xlim(),
-                   mean_vrad-sig_vrad, mean_vrad+sig_vrad,
-                   color='grey', alpha=0.25)
+    plt.xlim(orders[0]-1, orders[-1]+1)
+    plt.fill_between(plt.xlim(),
+                     mean_vrad-sig_vrad, mean_vrad+sig_vrad,
+                     color='grey', alpha=0.25)
 
-  plt.plot(orders, l_vrad, 'o', color='black')
-  plt.axhline(mean_vrad, color='black')
+    plt.plot(orders, l_vrad, 'o', color='black')
+    plt.axhline(mean_vrad, color='black')
 
-  plt.xlabel("Aperture number")
-  plt.ylabel("Velocity (km/s)")
-  plt.title("Multi-order results")
+    plt.xlabel("Aperture number")
+    plt.ylabel("Velocity (km/s)")
+    plt.title("Multi-order results")
 
-  str = ""
+    str = ""
 
-  for ii, order in enumerate(orders):
-    str += "Ap {0:3d}  dRV = {1:7.4f} km/s  h = {2:.4f}\n".format(order, l_vrad[ii], l_corr[ii])
+    for ii, order in enumerate(orders):
+      str += "Ap {0:3d}  dRV = {1:7.4f} km/s  h = {2:.4f}\n".format(order, l_vrad[ii], l_corr[ii])
 
-  str += "\n"
+    str += "\n"
 
-  str += "RMS = {0:.4f} km/s\n".format(sig_vrad)
+    str += "RMS = {0:.4f} km/s\n".format(sig_vrad)
 
-  str += "\n"
+    str += "\n"
 
-  str += "Mean dRV = {0:.4f} +/- {1:.4f} km/s\n".format(mean_vrad, e_mean_vrad)
+    str += "Mean dRV = {0:.4f} +/- {1:.4f} km/s\n".format(mean_vrad, e_mean_vrad)
 
-  fig.text(0.1, 0.1, str)
+    fig.text(0.1, 0.1, str)
 
-  pdf.savefig(fig)
-  plt.close()
+    pdf.savefig(fig)
+    plt.close()
 
   return mean_vrad, e_mean_vrad
 
@@ -280,6 +283,7 @@ ap.add_argument("-c", metavar="ra dec pmra pmdec plx vrad epoch", type=str, help
 ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
+ap.add_argument("-S", action="store_true", help="don't stack epochs to make high SNR template")
 args = ap.parse_args()
 
 # New read_spec structure.
@@ -298,8 +302,131 @@ tmplname = re.sub(r'_cb\.spec$', "", stripname(args.template))
 filelist = args.filelist
 nf = len(args.filelist)
 
+# Orders.
+multiorders = rs.multiorder
+if args.o is not None:
+  multiorders = [ args.o ]
+
+# Read spectra.
+nspec = nf+1
+
+filenamelist = [None] * nspec
+speclist = [None] * nspec
+
+filenamelist[0] = args.template
+speclist[0] = tmplsp
+
 for ifile, filename in enumerate(filelist):
   sp = rs.read_spec(filename, src_str=args.c, wantstruct=True, doreject=not args.R)
+
+  filenamelist[ifile+1] = filename
+  speclist[ifile+1] = sp
+
+# Stacking, if requested and possible.
+is_stack = False
+
+tmplsp_flux = tmplsp.flux
+tmplsp_e_flux = tmplsp.e_flux
+
+if nspec > 2 and not args.S:
+  for iiter in range(3):
+    fluxlist = [None] * nspec
+    e_fluxlist = [None] * nspec
+    normedlist = [None] * nspec
+    e_normedlist = [None] * nspec
+    wtlist = numpy.empty([nspec])
+
+    fluxlist[0] = tmplsp.flux
+    e_fluxlist[0] = tmplsp.e_flux
+    normedlist[0] = tmplsp.flux
+    e_normedlist[0] = tmplsp.e_flux
+    wtlist[0] = numpy.median(tmplsp.flux[numpy.isfinite(tmplsp.flux)])
+
+    for ifile, filename in enumerate(filelist):
+      sp = speclist[ifile+1]
+
+      mean_vrad, e_mean_vrad = do_multi_vrad(None, None, None,
+                                             tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
+                                             sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
+                                             orders=multiorders, emchop=emchop)
+
+      restwave = sp.wave / (1.0 + mean_vrad * 1000 / lfa.LIGHT)
+
+      nord, npix = restwave.shape
+
+      fluxout = numpy.empty_like(sp.flux)
+      e_fluxout = numpy.empty_like(sp.flux)
+
+      wtout = None
+
+      normord = rs.singleorder-1
+
+      for iord in range(nord):
+        interp_flux, interp_e_flux = finterp(tmplsp.wave[iord,:], restwave[iord,:], sp.flux[iord,:], sp.e_flux[iord,:])
+
+        fluxout[iord,:] = interp_flux
+        e_fluxout[iord,:] = interp_e_flux
+
+        if iord == normord:
+          wtout = numpy.median(interp_flux[numpy.isfinite(interp_flux)])
+          wtlist[ifile+1] = wtout
+
+      fluxlist[ifile+1] = fluxout
+      e_fluxlist[ifile+1] = e_fluxout
+      normedlist[ifile+1] = fluxout * wtlist[0] / wtout
+      e_normedlist[ifile+1] = e_fluxout * wtlist[0] / wtout
+
+    fluxlist = numpy.array(fluxlist)
+    e_fluxlist = numpy.array(e_fluxlist)
+    normedlist = numpy.array(normedlist)
+    e_normedlist = numpy.array(e_normedlist)
+
+    if not args.R:
+      # Attempt to locate +ve outliers using median and uncertainties.
+      # Individual spectra are normalized to the first one using counts
+      # in reference order to reduce effect of exposure time variations.
+      mednormed = numpy.median(normedlist, axis=0)
+      mederrnormed = numpy.median(e_normedlist, axis=0)
+
+      # Per-pixel weights for final combine (0 or 1).
+      # Assumes error in median = median error, i.e. we get no noise
+      # improvement from taking the median.  This isn't true and
+      # becomes increasingly pessimistic as N gets larger, but typically
+      # we expect this to be used for very small N where it's important
+      # to account for the error in the median and this can't be done
+      # empirically.  Cosmics we need to reject are usually very large
+      # deviations so I think it should still work okay.
+      combmask = normedlist - mednormed < 5*numpy.hypot(e_normedlist, mederrnormed)
+    else:
+      combmask = numpy.ones_like(fluxlist, dtype=numpy.bool)
+
+    # Weighted mean.  Unlike in read_spec we do not scale back to sum equiv.
+    swt = numpy.sum(combmask, axis=0)
+
+    norm = numpy.empty_like(swt, dtype=numpy.double)
+    norm.fill(numpy.nan)
+
+    norm[swt > 0] = 1.0 / swt[swt > 0]
+
+    stacked_flux = numpy.sum(fluxlist*combmask, axis=0) * norm
+    ssq = numpy.sum((e_fluxlist**2)*combmask, axis=0) * norm
+
+    # Final uncertainty in sum = quadrature sum of uncertainties.
+    stacked_e_flux = numpy.sqrt(ssq)
+
+    # Replace template.
+    tmplsp_flux = stacked_flux
+    tmplsp_e_flux = stacked_e_flux
+
+  tmplname = "Stack"
+  is_stack = True
+
+# Main correlation loop.
+for ispec, sp in enumerate(speclist):
+  if ispec == 0 and not is_stack:
+    continue
+
+  filename = filenamelist[ispec]
 
   targname = re.sub(r'_cb\.spec$', "", stripname(filename))
 
@@ -310,22 +437,18 @@ for ifile, filename in enumerate(filelist):
 
   # Velocity.
   vrad, hbest = do_vrad(pdf, tmplname, targname,
-                        tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
+                        tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
                         sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
                         order=rs.singleorder, emchop=emchop)
 
-  multiorders = rs.multiorder
-  if args.o is not None:
-    multiorders = [ args.o ]
-
   do_lsd(pdf, filename,
-         tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
+         tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
          sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
          vrad,
          orders=multiorders, emchop=emchop)
 
   mean_vrad, e_mean_vrad = do_multi_vrad(pdf, tmplname, targname,
-                                         tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
+                                         tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
                                          sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
                                          orders=multiorders, emchop=emchop)
 
