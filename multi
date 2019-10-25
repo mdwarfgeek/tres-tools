@@ -33,7 +33,7 @@ from read_spec import *
 figsize = (10.5, 7.8)  # inches
 
 # Velocity range to plot
-velrange = 150  # km/s, plots +/- this much
+velrange = 200  # km/s, plots +/- this much
 
 # Limb darkening coefficients for rotational broadening kernel.
 # These are from Phoenix mod. atm. for Teff=3224K, logg=5, Rc band,
