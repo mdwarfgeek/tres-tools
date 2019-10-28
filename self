@@ -198,14 +198,33 @@ def do_lsd(pdf, filename,
 def do_multi_vrad(pdf, tmplname, filename,
                   tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
                   mbjd, wave, flux, e_flux, msk,
-                  orders, emchop=True):
+                  orders, qvalues, emchop=True):
   l_vrad = numpy.empty_like(orders, dtype=numpy.double)
+  l_e_vrad = numpy.empty_like(orders, dtype=numpy.double)
   l_corr = numpy.empty_like(orders, dtype=numpy.double)
 
   for ii, order in enumerate(orders):
     # Extract order and clean.
     thistmpl_wave, thistmpl_flux, thistmpl_e_flux = prepord(order, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk)
     thiswave, thisflux, thise_flux = prepord(order, wave, flux, e_flux, msk)
+
+    emmask = numpy.isfinite(thisflux)
+    if emchop:
+      medflux, sigflux = medsig(thisflux[emmask])
+      emmask = numpy.logical_and(emmask,
+                                 thisflux < medflux + 5.0*sigflux)
+
+    if qvalues is not None:
+      # Use fixed set of default Q values in case template has low SNR.
+      q = qvalues[ii]
+
+      # Estimate of velocity uncertainty using target spectrum SNR.
+      ww = numpy.logical_and(emmask, thise_flux > 0)
+      snr = thisflux[ww] / thise_flux[ww]
+
+      velrms = lfa.LIGHT / (1000 * q * math.sqrt(numpy.sum(snr*snr)))
+    else:
+      velrms = 0
 
     # Take off sky.
     ss = makesky(thistmpl_wave, thistmpl_flux, 4)
@@ -229,8 +248,12 @@ def do_multi_vrad(pdf, tmplname, filename,
     vbest = zbest * lfa.LIGHT / 1000
 
     l_vrad[ii] = vbest
+    l_e_vrad[ii] = velrms
     l_corr[ii] = hbest
 
+  nord = len(l_vrad)
+
+  # Mean of orders, unweighted.
   mean_vrad = numpy.mean(l_vrad)
   sig_vrad = numpy.std(l_vrad)
 
@@ -238,6 +261,27 @@ def do_multi_vrad(pdf, tmplname, filename,
     e_mean_vrad = sig_vrad / math.sqrt(len(l_vrad)-1)
   else:
     e_mean_vrad = 0
+
+  wt_mean_vrad = None
+  wt_e_mean_vrad = None
+
+  if qvalues is not None:
+    # Mean of orders, weighted by uncertainties.
+    wt = 1.0 / (l_e_vrad*l_e_vrad)
+    swt = numpy.sum(wt)
+    
+    wt_mean_vrad = numpy.sum(l_vrad * wt) / swt
+    
+    # Correction for overdispersion.  We often operate with small N here
+    # so this is not allowed to be less than unity, otherwise I found it
+    # sometimes was, but probably just due to statistical fluke.
+    chisq = numpy.sum(wt * (l_vrad - wt_mean_vrad)**2)
+    errscl = math.sqrt(chisq / (nord - 1))
+    if errscl < 1.0:
+      errscl = 1.0
+
+    # Resulting error in weighted mean.
+    wt_e_mean_vrad = errscl / math.sqrt(swt)
 
   if pdf is not None:
     fig = plt.figure(figsize=figsize)
@@ -274,7 +318,10 @@ def do_multi_vrad(pdf, tmplname, filename,
     pdf.savefig(fig)
     plt.close()
 
-  return mean_vrad, e_mean_vrad, l_vrad, l_corr
+  if wt_mean_vrad is not None:
+    return wt_mean_vrad, wt_e_mean_vrad, l_vrad, l_corr
+  else:
+    return mean_vrad, e_mean_vrad, l_vrad, l_corr
 
 ap = argparse.ArgumentParser()
 ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
@@ -306,6 +353,8 @@ nf = len(args.filelist)
 multiorders = rs.multiorder
 if args.o is not None:
   multiorders = [ args.o ]
+
+qvalues = rs.qvalues
 
 # Read spectra.
 nspec = nf+1
@@ -348,7 +397,7 @@ if nspec > 2 and not args.S:
       mean_vrad, e_mean_vrad, l_vrad, l_corr = do_multi_vrad(None, None, None,
                                                              tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
                                                              sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
-                                                             orders=multiorders, emchop=emchop)
+                                                             orders=multiorders, qvalues=qvalues, emchop=emchop)
 
       restwave = sp.wave / (1.0 + mean_vrad * 1000 / lfa.LIGHT)
 
@@ -450,7 +499,7 @@ for ispec, sp in enumerate(speclist):
   mean_vrad, e_mean_vrad, l_vrad, l_corr = do_multi_vrad(pdf, tmplname, targname,
                                                          tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
                                                          sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
-                                                         orders=multiorders, emchop=emchop)
+                                                         orders=multiorders, qvalues=qvalues, emchop=emchop)
 
   pdf.close()
 

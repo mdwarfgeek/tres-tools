@@ -36,6 +36,7 @@ class read_spec:
     self.singleorder = None
     self.multiorder = None
     self.overrideorder = None
+    self.qvalues = None
 
   def read_spec(self, filespec, src=None, src_str=None, istmpl=False, wantstruct=False, doreject=True):
     # Convert file specification from script argument into a file list.
@@ -162,6 +163,12 @@ class read_spec:
 
       if self.overrideorder is not None:
         self.singleorder = self.overrideorder
+
+      # Q values.
+      try:
+        self.qvalues = eval("m."+specname + "_qvalues()")
+      except:
+        self.qvalues = None
 
     elif specname != self.specname:
       raise RuntimeError("files seem to be from different instruments: previous {0:s} current file {2:s} instrument {3:s}".format(self.specname, filename, specname))
