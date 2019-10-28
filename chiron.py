@@ -7,7 +7,6 @@ import string
 import matplotlib.pyplot as plt
 
 from multispec import *
-from scombine import *
 
 # Return observer structure needed for rest.  It could be recreated
 # each time inside the read routine but this is quite inefficient.
