@@ -389,7 +389,11 @@ if nspec > 2 and not args.S:
     e_fluxlist[0] = tmplsp.e_flux
     normedlist[0] = tmplsp.flux
     e_normedlist[0] = tmplsp.e_flux
-    wtlist[0] = numpy.median(tmplsp.flux[numpy.isfinite(tmplsp.flux)])
+
+    normord = rs.singleorder-1
+
+    normordflux = tmplsp.flux[normord,:]
+    wtlist[0] = numpy.median(normordflux[numpy.isfinite(normordflux)])
 
     for ifile, filename in enumerate(filelist):
       sp = speclist[ifile+1]
@@ -407,8 +411,6 @@ if nspec > 2 and not args.S:
       e_fluxout = numpy.empty_like(sp.flux)
 
       wtout = None
-
-      normord = rs.singleorder-1
 
       for iord in range(nord):
         interp_flux, interp_e_flux = finterp(tmplsp.wave[iord,:], restwave[iord,:], sp.flux[iord,:], sp.e_flux[iord,:])
