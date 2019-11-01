@@ -115,22 +115,24 @@ def do_optimize(filelist, targlist, optlist, init_parm):
   nfit = len(optlist)
 
   # Standard bounds.
-  parm_bounds = [None] * NPARM
-  parm_bounds[PAR_ALPHA]  = (0.01, 1.0)
-  parm_bounds[PAR_BETA]   = (0.01, 1.0)
-  parm_bounds[PAR_VSINIA] = (0.0, None)
-  parm_bounds[PAR_VSINIB] = (0.0, None)
-  parm_bounds[PAR_VSINIC] = (0.0, None)
+  std_lbound = numpy.array([ 0.01, 0.01,   0.0,   0.0,   0.0 ])
+  std_ubound = numpy.array([ 1.0,  1.0,  100.0, 100.0, 100.0 ])
 
   # Make vector of fit parameters.
   vinit = init_parm[optlist]
-  vbounds = [ parm_bounds[i] for i in optlist ]
+  lbound = std_lbound[optlist]
+  ubound = std_ubound[optlist]
 
   def fit_func(p):
     ssqh = 0
 
     trial_parm = numpy.copy(init_parm)
     trial_parm[optlist] = p
+
+    l_x = numpy.empty([len(filelist)])
+    l_y = numpy.empty([len(filelist)])
+    l_z = numpy.empty([len(filelist)])
+    l_w = numpy.empty([len(filelist)])
 
     for ifile, filename in enumerate(filelist):
       sp = targlist[ifile]
@@ -147,16 +149,22 @@ def do_optimize(filelist, targlist, optlist, init_parm):
                                              trial_parm[PAR_BETA],
                                              order=rs.singleorder)
 
+      l_x[ifile] = xbest
+      l_y[ifile] = ybest
+      l_z[ifile] = zbest
+      l_w[ifile] = math.sqrt(1.0-hbest*hbest)
+
       ssqh += hbest*hbest
 
     print >>sys.stderr, "Trial:", trial_parm, "ssqh =", ssqh
 
-    return -ssqh
+    return l_w
 
-  vfit = scipy.optimize.fmin_slsqp(fit_func,
-                                   vinit,
-                                   bounds=vbounds,
-                                   epsilon=0.01)
+  res = scipy.optimize.least_squares(fit_func, vinit,
+                                     bounds=(lbound, ubound),
+                                     diff_step=0.01)
+
+  vfit = res.x
 
   final_parm = numpy.copy(init_parm)
   final_parm[optlist] = vfit
