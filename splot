@@ -1,0 +1,342 @@
+#!/usr/bin/env python
+
+import argparse
+import numpy
+import sys
+
+import scipy.optimize
+
+import matplotlib
+
+from eqwidth import *
+from read_spec import *
+
+# Figure size based on pgplot.
+figsize = (10.5, 7.8)  # inches
+
+ap = argparse.ArgumentParser()
+ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
+ap.add_argument("-o", type=int, help="plot order")
+ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
+args = ap.parse_args()
+
+# Override all key bindings.
+for key in matplotlib.rcParams.keys():
+  if key.find("keymap.") == 0:
+    matplotlib.rcParams[key] = ""
+
+import matplotlib.pyplot as plt
+
+# New read_spec structure.
+rs = read_spec()
+
+if args.o is not None:
+  rs.overrideorder = args.o
+
+for filename in args.filelist:
+  sp = rs.read_spec(filename, wantstruct=True, doreject=not args.R)
+
+  nord, npix = sp.wave.shape
+
+  order = rs.singleorder
+
+  iord = order-1
+
+  thiswave = sp.wave[iord,:]
+  thisflux = sp.flux[iord,:]
+  thise_flux = sp.e_flux[iord,:]
+
+  in_e = False
+  in_k = False
+  in_w = False
+  in_we = False
+
+  in_x = None
+  in_y = None
+
+  use_pixels = False
+
+  fig = plt.figure(figsize=figsize)
+
+  line, = plt.plot(thiswave, thisflux, color="black")
+  
+  def chorder():
+    global order
+    global iord
+    global thiswave
+    global thisflux
+    global thise_flux
+    global use_pixels
+
+    iord = order-1
+
+    if use_pixels:
+      thiswave = numpy.arange(len(sp.flux[iord,:]), dtype=numpy.double) + 1
+      plt.xlabel("Pixel")
+
+    else:
+      thiswave = sp.wave[iord,:]
+      plt.xlabel("Barycentric wavelength (A)")
+
+    thisflux = sp.flux[iord,:]
+    thise_flux = sp.e_flux[iord,:]
+
+    plt.title(filename + " order {0:d}".format(order))
+
+  def autoscale():
+    global thiswave
+    global thisflux
+
+    xmin = numpy.min(thiswave)
+    xmax = numpy.max(thiswave)
+
+    xpmin = xmin - 0.02*(xmax-xmin)
+    xpmax = xmax + 0.02*(xmax-xmin)
+
+    ymin = numpy.min(thisflux)
+    ymax = numpy.max(thisflux)
+
+    ypmin = ymin - 0.04*(ymax-ymin)
+    ypmax = ymax + 0.04*(ymax-ymin)
+
+    plt.xlim(xpmin, xpmax)
+    plt.ylim(ypmin, ypmax)
+
+  def replot():
+    global line
+
+    line.set_xdata(thiswave)
+    line.set_ydata(thisflux)
+
+    update()
+
+  def update():
+    fig = plt.gcf()
+    fig.canvas.draw()
+    fig.canvas.flush_events()
+
+  def onkey(event):
+    global order
+    global in_w
+    global in_we
+    global in_e
+    global in_k
+    global in_x
+    global in_y
+    global thiswave
+    global thisflux
+    global thise_flux
+    global use_pixels
+
+    if in_we:
+      if event.key == "e":
+        xpmin = in_x
+        xpmax = event.xdata
+        ypmin = in_y
+        ypmax = event.ydata
+
+        plt.xlim(xpmin, xpmax)
+        plt.ylim(ypmin, ypmax)
+
+        update()
+
+      in_we = False
+
+    elif in_w:
+      if event.key == "e":
+        print "Again"
+        in_x = event.xdata
+        in_y = event.ydata
+
+        in_we = True
+
+      elif event.key == "a":
+        autoscale()
+        update()
+
+      in_w = False
+
+    elif in_e:
+      if event.key == "e":
+        if in_x < event.xdata:
+          xl = in_x
+          xh = event.xdata
+          yl = in_y
+          yh = event.ydata
+        else:
+          xh = in_x
+          xl = event.xdata
+          yh = in_y
+          yl = event.ydata
+
+        dx = xh-xl
+        dy = yh-yl
+
+        if dx > 0:
+          m = dy/dx
+
+          plt.plot([ xl, xh ], [ yl, yh ], "--", color="green")
+
+          fsub = thisflux - (yl + m * (thiswave - xl))
+
+          awave, bwave, width = subpixel(thiswave)
+          ww = numpy.logical_and(bwave >= xl, awave <= xh)
+
+          ss, sv, sl, sx = eqwidth_sum(awave, bwave, width,
+                                       fsub, thise_flux,
+                                       0, 0,
+                                       xl, xh,
+                                       wantcent=True)
+
+          cont = 0.5*(yl+yh)
+
+          if cont != 0:
+            eqw = -ss / cont
+          else:
+            eqw = 0
+
+          if ss != 0:
+            xcent = sx / ss
+          else:
+            xcent = 0
+
+          xtmp = thiswave[ww]
+          ytmp = fsub[ww]
+
+          imax = numpy.argmax(numpy.absolute(ytmp))
+
+          plt.plot([ xtmp[imax], xtmp[imax] ], [ cont, cont+ytmp[imax] ], color="green")
+
+          print "center = {0:8.3f}, eqw = {1:8.4f}, continuum = {2:8.2f}, flux = {3:8.2f}".format(xcent, eqw, cont, ss)
+          
+        update()
+
+      in_e = False
+
+    elif in_k:
+      if in_x < event.xdata:
+        xl = in_x
+        xh = event.xdata
+        yl = in_y
+        yh = event.ydata
+      else:
+        xh = in_x
+        xl = event.xdata
+        yh = in_y
+        yl = event.ydata
+
+      dx = xh-xl
+      dy = yh-yl
+
+      if dx > 0:
+        xoff = 0.5*(xl+xh)
+        yoff = 0.5*(yl+yh)
+
+        m = dy/dx
+
+        plt.plot([ xl, xh ], [ yl, yh ], "--", color="green")
+
+        awave, bwave, width = subpixel(thiswave)
+        ww = numpy.logical_and(bwave >= xl, awave <= xh)
+
+        fit_x = thiswave[ww] - xoff
+        fit_y = thisflux[ww] - (yoff + m * fit_x)
+
+        if fit_y.size > 2:
+          def fit_func(p, x):
+            return(p[0] * numpy.exp(-p[1] * (x - p[2])**2))
+
+          def min_func(p):
+            ymod = fit_func(p, fit_x)
+            return(fit_y - ymod)
+
+          pinit = numpy.array([numpy.max(numpy.absolute(fit_y)),
+                               1.0/(dx*dx),
+                               0.0])
+          pfit, ier = scipy.optimize.leastsq(min_func, pinit)
+
+          if ier >= 1 and ier <= 4:
+            a     = pfit[0]
+            sigsq = 0.5 / pfit[1]
+            mu    = pfit[2]
+
+            if sigsq > 0:
+              sigma = math.sqrt(sigsq)
+              xcent = xoff + mu
+
+              fwhm = 2.0 * math.sqrt(2.0 * math.log(2.0)) * sigma
+              flux = a * math.sqrt(2.0 * math.pi * sigsq)
+
+              if yoff != 0:
+                eqw = -flux / yoff
+              else:
+                eqw = 0
+
+              px = numpy.linspace(xl-xoff, xh-xoff, 1000)
+              py = fit_func(pfit, px)
+
+              plt.plot(xoff + px, yoff + m * px + py, color="red")
+
+              update()
+
+              print "center = {0:8.3f}, flux = {1:8.2f}, eqw = {2:8.4f}, gfwhm = {3:8.4f}".format(xcent, flux, eqw, fwhm)
+
+      in_k = False
+
+    else:
+      if event.key == "$":
+        use_pixels = not use_pixels
+
+        chorder()
+        autoscale()
+        replot()
+
+      elif event.key == "(":
+        if order > 1:
+          order -= 1
+          chorder()
+          autoscale()
+          replot()
+
+      elif event.key == ")":
+        if order < nord:
+          order += 1
+          chorder()
+          autoscale()
+          replot()
+
+      elif event.key == "e":
+        in_x = event.xdata
+        in_y = event.ydata
+
+        print "Again"
+        in_e = True
+
+      elif event.key == "k":
+        in_x = event.xdata
+        in_y = event.ydata
+
+        print "Again"
+        in_k = True
+
+      elif event.key == "q":
+        plt.close()
+
+      elif event.key == "w":
+        print "Window"
+        in_w = True
+
+  autoscale()
+  
+  plt.xlabel("Barycentric wavelength (A)")
+  plt.ylabel("Counts")
+
+  plt.title(filename + " order {0:d}".format(order))
+
+  fig.canvas.mpl_connect("key_press_event", onkey)
+
+  plt.show()
+
+
+
+

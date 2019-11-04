@@ -32,7 +32,8 @@ def subpixel(wave):
 
 def eqwidth_sum(awave, bwave, width, flux, e_flux,
                 cont, e_cont,
-                bin_awave, bin_bwave):
+                bin_awave, bin_bwave,
+                wantcent=False):
   # Whole pixels.
   ww = numpy.logical_and(awave >= bin_awave,
                          bwave <= bin_bwave)
@@ -40,6 +41,7 @@ def eqwidth_sum(awave, bwave, width, flux, e_flux,
   ss = numpy.sum((flux[ww]-cont)*width[ww])
   sv = numpy.sum((e_flux[ww]*width[ww])**2)
   sl = numpy.sum(width[ww])
+  sx = numpy.sum(0.5*(awave[ww]+bwave[ww])*(flux[ww]-cont)*width[ww])
 
   npix = len(flux)
 
@@ -55,6 +57,7 @@ def eqwidth_sum(awave, bwave, width, flux, e_flux,
     ss += (flux[ii]-cont) * dl
     sv += (e_flux[ii] * dl)**2
     sl += dl
+    sx += 0.5*(awave[ii]+bwave[ii])*(flux[ii]-cont) * dl
   else:
     return None
 
@@ -64,10 +67,14 @@ def eqwidth_sum(awave, bwave, width, flux, e_flux,
     ss += (flux[jj]-cont) * dl
     sv += (e_flux[ii] * dl)**2
     sl += dl
+    sx += 0.5*(awave[jj]+bwave[jj])*(flux[jj]-cont) * dl
   else:
     return None
 
-  return ss, sv, sl
+  if wantcent:
+    return ss, sv, sl, sx
+  else:
+    return ss, sv, sl
 
 def eqwidth(awave, bwave, width, flux, e_flux,
             cont, e_cont,
