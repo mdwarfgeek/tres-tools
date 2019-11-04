@@ -16,6 +16,7 @@ figsize = (10.5, 7.8)  # inches
 
 ap = argparse.ArgumentParser()
 ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
+ap.add_argument("-c", metavar="ra dec pmra pmdec plx vrad epoch", type=str, help="specify catalogue information for target")
 ap.add_argument("-o", type=int, help="plot order")
 ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 args = ap.parse_args()
@@ -34,7 +35,7 @@ if args.o is not None:
   rs.overrideorder = args.o
 
 for filename in args.filelist:
-  sp = rs.read_spec(filename, wantstruct=True, doreject=not args.R)
+  sp = rs.read_spec(filename, src_str=args.c, wantstruct=True, doreject=not args.R)
 
   nord, npix = sp.wave.shape
 
