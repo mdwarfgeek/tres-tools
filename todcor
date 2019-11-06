@@ -49,7 +49,8 @@ def do_todcor(pdf, tmplaname, tmplbname, filename,
               tmpla_mbjd, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk, tmpla_vbcv, tmpla_vrad,
               tmplb_mbjd, tmplb_wave, tmplb_flux, tmplb_e_flux, tmplb_msk, tmplb_vbcv, tmplb_vrad,
               mbjd, wave, flux, e_flux, msk, vbcv,
-              vsinia, vsinib, alpha, order):
+              vsinia, vsinib, alpha, order,
+              restrict):
 
   # Extract order and clean.
   thistmpla_wave, thistmpla_flux, thistmpla_e_flux = prepord(order, tmpla_wave, tmpla_flux, tmpla_e_flux, tmpla_msk)
@@ -95,7 +96,8 @@ def do_todcor(pdf, tmplaname, tmplbname, filename,
                      ald, bld)
 
   va, vb, h = tc.run(minvela, maxvela,
-                     minvelb, maxvelb)
+                     minvelb, maxvelb,
+                     restrict=restrict)
 
   if pdf is not None:
     fig = plt.figure(figsize=figsize)
@@ -165,7 +167,7 @@ def do_todcor(pdf, tmplaname, tmplbname, filename,
 
   return va, vb, h
 
-def do_optimize(filelist, targlist, optlist, init_parm):
+def do_optimize(filelist, targlist, restrictlist, optlist, init_parm):
 
   nfit = len(optlist)
 
@@ -198,7 +200,8 @@ def do_optimize(filelist, targlist, optlist, init_parm):
                                       trial_parm[PAR_VSINIA],
                                       trial_parm[PAR_VSINIB],
                                       trial_parm[PAR_ALPHA],
-                                      order=rs.singleorder)
+                                      order=rs.singleorder,
+                                      restrict=restrictlist[ifile])
 
       l_x[ifile] = xbest
       l_y[ifile] = ybest
@@ -225,7 +228,7 @@ def do_optimize(filelist, targlist, optlist, init_parm):
 
   return final_parm
 
-def do_fixed(filelist, targlist, parm, dopdf=False):
+def do_fixed(filelist, targlist, restrictlist, parm, dopdf=False):
   ssqh = 0
 
   for ifile, filename in enumerate(filelist):
@@ -247,7 +250,8 @@ def do_fixed(filelist, targlist, parm, dopdf=False):
                                     parm[PAR_VSINIA],
                                     parm[PAR_VSINIB],
                                     parm[PAR_ALPHA],
-                                    order=rs.singleorder)
+                                    order=rs.singleorder,
+                                    restrict=restrictlist[ifile])
     
     if pdf is not None:
       pdf.close()
@@ -279,6 +283,7 @@ ap.add_argument("-c", metavar="ra dec pmra pmdec plx vrad epoch", type=str, help
 ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-p", action="store_true", help="save plots of 2-D correlation function")
+ap.add_argument("-r", metavar="restrict", help="restrict sign of velocity difference")
 ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 args = ap.parse_args()
 
@@ -307,8 +312,16 @@ nf = len(args.filelist)
 
 # Read targets.
 targlist = [None] * nf
+restrictlist = [None] * nf
 for ifile, filename in enumerate(filelist):
   targlist[ifile] = rs.read_spec(filename, src_str=args.c, wantstruct=True, doreject=not args.R)
+  if args.r is None:
+    restrictlist[ifile] = None
+  else:
+    if ifile < len(args.r):
+      restrictlist[ifile] = args.r[ifile]
+    else:
+      restrictlist[ifile] = None
 
 minvela, maxvela = args.alim
 minvelb, maxvelb = args.blim
@@ -327,7 +340,7 @@ if m:
     trial_parm = numpy.copy(parm)
     trial_parm[PAR_ALPHA] = l_lrat[ilrat]
 
-    ssqh = do_fixed(filelist, targlist, trial_parm)
+    ssqh = do_fixed(filelist, targlist, restrictlist, trial_parm)
     l_ssqh[ilrat] = ssqh
 
   coef = numpy.polynomial.polynomial.polyfit(l_lrat, l_ssqh, 2)
@@ -381,9 +394,9 @@ else:
     
     optlist = [ pars[s.lower()] for s in inplist ]
 
-    parm = do_optimize(filelist, targlist, optlist, parm)
+    parm = do_optimize(filelist, targlist, restrictlist, optlist, parm)
 
-  ssqh = do_fixed(filelist, targlist, parm, args.p)
+  ssqh = do_fixed(filelist, targlist, restrictlist, parm, args.p)
 
 sys.exit(0)
 

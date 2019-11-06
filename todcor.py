@@ -84,15 +84,26 @@ class todcor:
 
   def find(self,
            iamin, iamax, iastep,
-           ibmin, ibmax, ibstep):
+           ibmin, ibmax, ibstep,
+           restrict=None):
 
-    inda = numpy.arange(iamin, iamax+1, iastep)
+    all_inda = numpy.arange(iamin, iamax+1, iastep)
     
     iabest = None
     ibbest = None
     hsqbest = None
 
     for ib in range(ibmin, ibmax+1, ibstep):
+      if restrict is None:
+        inda = all_inda
+      else:
+        if restrict == "n":
+          inda = all_inda[all_inda <= ib]
+        elif restrict == "p":
+          inda = all_inda[all_inda >= ib]
+        else:
+          inda = all_inda
+
       dab = ib - inda
       c_tmplb_tmpla = self.corrtaxb[self.hbin+dab]
 
@@ -105,7 +116,7 @@ class todcor:
       hsqmax = hsq[smax]
 
       if hsqbest is None or hsqmax > hsqbest:
-        iabest = iamin + smax * iastep
+        iabest = inda[0] + smax * iastep
         ibbest = ib
         hsqbest = hsqmax
 
@@ -126,7 +137,8 @@ class todcor:
   def run(self,
           minvela=-250, maxvela=250,
           minvelb=-250, maxvelb=250,
-          fpsamp=1, fpexpand=16, pkfit=1, rpk=2):
+          fpsamp=1, fpexpand=16, pkfit=1, rpk=2,
+          restrict=None):
 
     # Perform initial search using coarse grid.
     iamin = self.vel2ind(minvela)
@@ -135,7 +147,8 @@ class todcor:
     ibmax = self.vel2ind(maxvelb)
 
     iabest, ibbest, hsqbest = self.find(iamin, iamax, fpsamp,
-                                        ibmin, ibmax, fpsamp)
+                                        ibmin, ibmax, fpsamp,
+                                        restrict=restrict)
 
     if fpsamp > 1:
       # Refine at full resolution.
@@ -146,7 +159,8 @@ class todcor:
       ibmax = min(ibmax, ibbest + fpexpand*fpsamp)
       
       iabest, ibbest, hsqbest = self.find(iamin, iamax, 1,
-                                          ibmin, ibmax, 1)
+                                          ibmin, ibmax, 1,
+                                          restrict=restrict)
 
     if pkfit:
       # Refine peak using 2-D quadratic fit.
