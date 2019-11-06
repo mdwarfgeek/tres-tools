@@ -97,7 +97,7 @@ class todcor:
       if restrict is None:
         inda = all_inda
       else:
-        if restrict == "n":
+        if restrict == "n" or restrict == "s":
           inda = all_inda[all_inda <= ib]
         elif restrict == "p":
           inda = all_inda[all_inda >= ib]
