@@ -331,6 +331,11 @@ ap.add_argument("-E", action="store_true", help="don't remove emission lines fro
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 ap.add_argument("-S", action="store_true", help="don't stack epochs to make high SNR template")
+
+if len(sys.argv) == 1:
+  ap.print_help(sys.stderr)
+  sys.exit(1)
+
 args = ap.parse_args()
 
 # New read_spec structure.

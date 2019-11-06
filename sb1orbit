@@ -31,6 +31,11 @@ ap.add_argument("-n", type=int, help="set number of MCMC samples to N")
 ap.add_argument("-t", action="store_true", help="integrate model over exposure time")
 ap.add_argument("-u", action="store_true", help="plot unfolded phase")
 ap.add_argument("-w", type=int, help="set number of walkers")
+
+if len(sys.argv) == 1:
+  ap.print_help(sys.stderr)
+  sys.exit(1)
+
 args = ap.parse_args()
 
 # Type 42 fonts needed for publication.

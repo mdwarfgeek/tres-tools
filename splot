@@ -19,6 +19,11 @@ ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @l
 ap.add_argument("-c", metavar="ra dec pmra pmdec plx vrad epoch", type=str, help="specify catalogue information for target")
 ap.add_argument("-o", type=int, help="plot order")
 ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
+
+if len(sys.argv) == 1:
+  ap.print_help(sys.stderr)
+  sys.exit(1)
+
 args = ap.parse_args()
 
 # Override all key bindings.

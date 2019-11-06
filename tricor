@@ -239,6 +239,11 @@ ap.add_argument("-E", action="store_true", help="don't remove emission lines fro
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-p", action='store_true', help="save plots of 3-D correlation function")
 ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
+
+if len(sys.argv) == 1:
+  ap.print_help(sys.stderr)
+  sys.exit(1)
+
 args = ap.parse_args()
 
 # New read_spec structure.

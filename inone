@@ -622,6 +622,11 @@ ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 ap.add_argument("-r", metavar="vsini", type=float, help="use fixed rotation for final velocity analysis")
 ap.add_argument("-w", type=get_range, default=None, help="set wavelength range -w='min:max' in A")
+
+if len(sys.argv) == 1:
+  ap.print_help(sys.stderr)
+  sys.exit(1)
+
 args = ap.parse_args()
 
 # New read_spec structure.
