@@ -795,18 +795,24 @@ if args.double:
       drift = True
 
   if drift:
-    coef = numpy.polynomial.polynomial.polyfit(bjd-parm[eb.PAR_T0], v2, 1, full=False)
+    coef = numpy.polynomial.polynomial.polyfit(bjd-parm[eb.PAR_T0], v2, 1, full=False, w=hh*hh)
     mod2 = numpy.polynomial.polynomial.polyval(bjd-parm[eb.PAR_T0], coef)
     mean2 = coef[0]
   else:
-    mean2 = numpy.mean(v2)
+    mean2 = numpy.average(v2, weights=hh*hh)
     mod2 = mean2
 
   resid2 = v2 - mod2
   if args.e:
-    err2 = numpy.hypot(parm[PAR_S], e_v1)  # consistent but probably no!
+    print "Don't know how we got here"
+    sys.exit(1)
   else:
-    err2 = parm[PAR_S] / hh
+    tmp = resid2 * hh
+    chisq = numpy.sum(tmp*tmp)
+    npar = 1
+    if drift:
+      npar += 1
+    err2 = math.sqrt(chisq / (hh.size-npar))
 
   if drift:
     sgn = "+"
@@ -815,6 +821,8 @@ if args.double:
     print "gamma2 =", coef[0], "km/s", sgn, abs(coef[1]), "km/s/day"
   else:
     print "gamma2 =", mean2, "km/s"
+
+  print "sigma2 =", err2, "km/s"
 
   if args.u and drift:
     dbjdmin = phimin * parm[eb.PAR_P]
