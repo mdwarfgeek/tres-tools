@@ -99,8 +99,10 @@ for filename in args.filelist:
     xpmin = xmin - 0.02*(xmax-xmin)
     xpmax = xmax + 0.02*(xmax-xmin)
 
-    ymin = numpy.min(thisflux)
-    ymax = numpy.max(thisflux)
+    ww = numpy.isfinite(thisflux)
+
+    ymin = numpy.min(thisflux[ww])
+    ymax = numpy.max(thisflux[ww])
 
     ypmin = ymin - 0.04*(ymax-ymin)
     ypmax = ymax + 0.04*(ymax-ymin)
