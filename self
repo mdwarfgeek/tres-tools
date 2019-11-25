@@ -272,13 +272,16 @@ def do_multi_vrad(pdf, tmplname, filename,
     
     wt_mean_vrad = numpy.sum(l_vrad * wt) / swt
     
-    # Correction for overdispersion.  We often operate with small N here
-    # so this is not allowed to be less than unity, otherwise I found it
-    # sometimes was, but probably just due to statistical fluke.
-    chisq = numpy.sum(wt * (l_vrad - wt_mean_vrad)**2)
-    errscl = math.sqrt(chisq / (nord - 1))
-    if errscl < 1.0:
-      errscl = 1.0
+#    # Correction for overdispersion.  We often operate with small N here
+#    # so this is not allowed to be less than unity, otherwise I found it
+#    # sometimes was, but probably just due to statistical fluke.
+#    chisq = numpy.sum(wt * (l_vrad - wt_mean_vrad)**2)
+#    errscl = math.sqrt(chisq / (nord - 1))
+#    if errscl < 1.0:
+#      errscl = 1.0
+
+    # Disabled, didn't like the if statement (statistically dubious).
+    errscl = 1.0
 
     # Resulting error in weighted mean.
     wt_e_mean_vrad = errscl / math.sqrt(swt)
