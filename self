@@ -198,7 +198,7 @@ def do_lsd(pdf, filename,
 def do_multi_vrad(pdf, tmplname, filename,
                   tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
                   mbjd, wave, flux, e_flux, msk,
-                  orders, qvalues, emchop=True):
+                  orders, qvalues, emchop=True, doerrscl=False):
   l_vrad = numpy.empty_like(orders, dtype=numpy.double)
   l_e_vrad = numpy.empty_like(orders, dtype=numpy.double)
   l_corr = numpy.empty_like(orders, dtype=numpy.double)
@@ -272,16 +272,12 @@ def do_multi_vrad(pdf, tmplname, filename,
     
     wt_mean_vrad = numpy.sum(l_vrad * wt) / swt
     
-#    # Correction for overdispersion.  We often operate with small N here
-#    # so this is not allowed to be less than unity, otherwise I found it
-#    # sometimes was, but probably just due to statistical fluke.
-#    chisq = numpy.sum(wt * (l_vrad - wt_mean_vrad)**2)
-#    errscl = math.sqrt(chisq / (nord - 1))
-#    if errscl < 1.0:
-#      errscl = 1.0
-
-    # Disabled, didn't like the if statement (statistically dubious).
-    errscl = 1.0
+    # Correction for overdispersion.
+    if doerrscl:
+      chisq = numpy.sum(wt * (l_vrad - wt_mean_vrad)**2)
+      errscl = math.sqrt(chisq / (nord - 1))
+    else:
+      errscl = 1.0
 
     # Resulting error in weighted mean.
     wt_e_mean_vrad = errscl / math.sqrt(swt)
@@ -334,6 +330,7 @@ ap.add_argument("-E", action="store_true", help="don't remove emission lines fro
 ap.add_argument("-o", type=int, help="override order number used for analysis")
 ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 ap.add_argument("-S", action="store_true", help="don't stack epochs to make high SNR template")
+ap.add_argument("-s", action="store_true", help="scale errors using order scatter")
 
 if len(sys.argv) == 1:
   ap.print_help(sys.stderr)
@@ -409,7 +406,7 @@ if nspec > 2 and not args.S:
       mean_vrad, e_mean_vrad, l_vrad, l_corr = do_multi_vrad(None, None, None,
                                                              tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
                                                              sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
-                                                             orders=multiorders, qvalues=qvalues, emchop=emchop)
+                                                             orders=multiorders, qvalues=qvalues, emchop=emchop, doerrscl=args.s)
 
       restwave = sp.wave / (1.0 + mean_vrad * 1000 / lfa.LIGHT)
 
@@ -509,7 +506,7 @@ for ispec, sp in enumerate(speclist):
   mean_vrad, e_mean_vrad, l_vrad, l_corr = do_multi_vrad(pdf, tmplname, targname,
                                                          tmplsp.mbjd, tmplsp.wave, tmplsp_flux, tmplsp_e_flux, tmplsp.msk,
                                                          sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
-                                                         orders=multiorders, qvalues=qvalues, emchop=emchop)
+                                                         orders=multiorders, qvalues=qvalues, emchop=emchop, doerrscl=args.s)
 
   pdf.close()
 
