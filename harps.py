@@ -68,10 +68,6 @@ def harps_read_bary(hdr, obs=None, src=None):
   # Exposure time.
   exptime = hdr["ESO DET WIN1 DIT1"]
 
-  # Barycentric date and their vrad corrections.
-  bjd = float(hdr["ESO DRS BJD"]) - lfa.ZMJD  # UTC
-  bvel = float(hdr["ESO DRS BERV"])  # km/s
-
   # Simultaneous thorium drift correction.  (NOT YET USED)
   if "ESO DRS DRIFT VR" in hdr:
     zth = float(hdr["ESO DRS DRIFT VR"]) / lfa.LIGHT
@@ -145,6 +141,10 @@ def harps_read_bary(hdr, obs=None, src=None):
     # Doppler
     zb = obs.bary_doppler(src, s, dsdt, pr)
   else:
+    # Barycentric date and their vrad corrections.
+    bjd = float(hdr["ESO DRS BJD"]) - lfa.ZMJD  # UTC
+    bvel = float(hdr["ESO DRS BERV"])  # km/s
+
     zb = bvel * 1000 / lfa.LIGHT
 
   return bjd, zb, exptime
