@@ -69,8 +69,8 @@ def harps_read_bary(hdr, obs=None, src=None):
   exptime = hdr["ESO DET WIN1 DIT1"]
 
   # Simultaneous thorium drift correction.  (NOT YET USED)
-  if "ESO DRS DRIFT VR" in hdr:
-    zth = float(hdr["ESO DRS DRIFT VR"]) / lfa.LIGHT
+  if "ESO DRS DRIFT SPE RV" in hdr:
+    zth = float(hdr["ESO DRS DRIFT SPE RV"]) / lfa.LIGHT
   else:
     zth = 0
 
@@ -240,3 +240,7 @@ def harps_orders():
 #  return 71, [63, 65, 66, 67, 69, 70, 71]
   return 71, [47, 48, 49, 50, 51, 52, 53, 54, 55, 56,
               59, 60, 61, 62, 63, 65, 66, 67, 69, 70, 71]
+
+def harps_qvalues():
+  return [ 16650, 16752, 30886, 24327, 18314, 23536, 18470, 15531, 16050, 19214,
+           18570, 16352, 13830, 25431, 24443, 26351, 24231, 23165, 24700, 30918,27946 ]
