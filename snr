@@ -35,5 +35,6 @@ for filename in args.filelist:
   snr = thisflux[ww] / thise_flux[ww]
   medsnr = numpy.median(snr)
 
-  print filename, medsnr, "pix"
+  print "{0:s} Order {1:d} Median {2:.1f} Central {3:.1f} pix".format(filename, rs.singleorder, medsnr, snr[npix//2])
+
 
