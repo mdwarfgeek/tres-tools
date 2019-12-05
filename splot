@@ -54,6 +54,7 @@ for filename in args.filelist:
 
   in_e = False
   in_k = False
+  in_m = False
   in_w = False
   in_we = False
 
@@ -129,6 +130,7 @@ for filename in args.filelist:
     global in_we
     global in_e
     global in_k
+    global in_m
     global in_x
     global in_y
     global thiswave
@@ -291,6 +293,39 @@ for filename in args.filelist:
 
       in_k = False
 
+    elif in_m:
+      if in_x < event.xdata:
+        xl = in_x
+        xh = event.xdata
+        yl = in_y
+        yh = event.ydata
+      else:
+        xh = in_x
+        xl = event.xdata
+        yh = in_y
+        yl = event.ydata
+
+      dx = xh-xl
+      dy = yh-yl
+
+      if dx > 0:
+        awave, bwave, width = subpixel(thiswave)
+        ww = numpy.logical_and(bwave >= xl, awave <= xh)
+
+        useflux = thisflux[ww]
+        usee_flux = thise_flux[ww]
+
+        mean = numpy.mean(useflux)
+        std = numpy.std(useflux)
+        snr = mean / std
+
+        wwp = usee_flux > 0
+        theosnr = numpy.mean(useflux[wwp] / usee_flux[wwp])
+
+        print "mean = {0:.1f}, rms = {1:.1f}, snr = {2:.2f}, theo_snr={3:.2f}".format(mean, std, snr, theosnr)
+
+      in_m = False
+
     else:
       if event.key == "$":
         use_pixels = not use_pixels
@@ -319,6 +354,13 @@ for filename in args.filelist:
 
         print "Again"
         in_e = True
+
+      elif event.key == "m":
+        in_x = event.xdata
+        in_y = event.ydata
+
+        print "Again"
+        in_m = True
 
       elif event.key == "k":
         in_x = event.xdata
