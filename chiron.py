@@ -128,9 +128,9 @@ def chiron_read(thefile, obs=None, src=None):
 
     else:  # Yale
       wave = im[:,:,0]
-      flux = im[:,:,1]
+      flux = im[:,:,1]  # spectrum is in ADU
 
-      e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0) + xwid*readnois*readnois) / gain
+      e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0)*gain + xwid*readnois*readnois) / gain
 
       blaze = None  # for now
 
@@ -141,7 +141,7 @@ def chiron_read(thefile, obs=None, src=None):
 
     flux = im
 
-    e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0) + xwid*readnois*readnois) / gain
+    e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0)*gain + xwid*readnois*readnois) / gain
 
     blaze = None  # for now
 
