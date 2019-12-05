@@ -1,5 +1,6 @@
 import fitsio
 import lfa
+import math
 import numpy
 import re
 
@@ -177,23 +178,67 @@ def harps_read(thefile, obs=None, src=None):
   # Wavelength calibration is stored as a polynomial for each order.
   # degree is HIERARCH ESO DRS CAL TH DEG LL
   # coeffs are HIERARCH ESO DRS CAL TH COEFF LL
-  degree = int(hdr["ESO DRS CAL TH DEG LL"])
-  ncoef = degree+1
+  wdegree = int(hdr["ESO DRS CAL TH DEG LL"])
+  wncoef = wdegree+1
+
+  # Also retrieve spatial FWHM of orders for estimating read noise.
+  fdegree = int(hdr["ESO DRS CAL LOC DEG FWHM"])
+  fncoef = fdegree+1
 
   wave = numpy.empty_like(flux, dtype=numpy.double)
+  fwhm = numpy.empty_like(flux, dtype=numpy.double)
 
   x = numpy.arange(0, nwave, dtype=numpy.double)  # XXX - numbers from zero?
-  coef = numpy.empty([ncoef])
+  wcoef = numpy.empty([wncoef])
+  fcoef = numpy.empty([fncoef])
 
   for iord in range(nord):
-    for i in range(ncoef):
-      key = "ESO DRS CAL TH COEFF LL{0:d}".format(i+iord*ncoef)
-      coef[i] = float(hdr[key])
+    for i in range(wncoef):
+      key = "ESO DRS CAL TH COEFF LL{0:d}".format(i+iord*wncoef)
+      wcoef[i] = float(hdr[key])
 
-    wave[iord,:] = numpy.polynomial.polynomial.polyval(x, coef)
+    wave[iord,:] = numpy.polynomial.polynomial.polyval(x, wcoef)
 
-  # Uncertainties.  Fluxes already in e-.
-  e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0) + readnois*readnois)
+    for i in range(fncoef):
+      key = "ESO DRS CAL LOC FWHM{0:d}".format(i+iord*fncoef)
+      fcoef[i] = float(hdr[key])
+
+    fwhm[iord,:] = numpy.polynomial.polynomial.polyval(x, fcoef)
+
+  # FWHM of red orders is underestimated in pipeline for reasons
+  # still unknown to me (suspicions are saturation or possibly
+  # contamination from the adjacent fibre if they use the more
+  # numerous variety of flats where both are illuminated).  They
+  # are never less than 3.1 pixels based on my measurements of
+  # the flats, so clamp there.
+  fwhm = numpy.where(fwhm > 3.1, fwhm, 3.1)
+
+  # Estimate variance for profile weighted extraction assuming
+  # the profile was a Gaussian of given FWHM from above.  As
+  # far as I can tell based on comments in the change log, this
+  # version of the pipeline is using the flat for the weights,
+  # but we don't have it and these Gaussians seem to be a decent
+  # approximation to the flats based on my tests.  We sum over
+  # a window of 25 pixels which is a bit larger than the one I
+  # think the pipeline uses but it shouldn't make any difference
+  # given the Gaussian weights are very close to zero for all
+  # the extra pixels.
+  sigma = fwhm / (2.0 * math.sqrt(2.0 * math.log(2.0)))
+  norm = math.sqrt(2.0 * math.pi) * sigma
+
+  pvar = numpy.where(flux > 0, flux, 0)  # Poisson variance
+
+  s1 = numpy.zeros_like(flux)
+  s2 = numpy.zeros_like(flux)
+  for ipix in range(25):
+    pix = ipix - 12
+
+    pwt = numpy.exp(-0.5*(pix/sigma)**2) / norm
+
+    s1 += pwt
+    s2 += pwt*pwt / (pwt*pvar + readnois*readnois)
+
+  e_flux = numpy.sqrt(s1 / s2)
 
   blaze = None  # for now
 
@@ -224,12 +269,14 @@ def harps_read_s1d(thefile, obs=None, src=None):
   # Detector parameters.
   readnois = float(hdr["ESO DRS CCD SIGDET"])
   gain = float(hdr["ESO DRS CCD CONAD"])  # NB already applied
+  xwid = 3.1  # a guess, it actually uses profile weighted extraction
 
   wave = multispec_lambda(hdr, nord, nwave)
   wave = wave[0,:]
 
   # Uncertainties.  Fluxes already in e-.
-  e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0) + readnois*readnois)
+  # Spectrum has been renormalized so this won't be correct.
+  e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0) + xwid*readnois*readnois)
 
   blaze = None  # for now
 
