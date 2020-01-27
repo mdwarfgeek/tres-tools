@@ -1,10 +1,9 @@
 import fitsio
 import lfa
 import numpy
+import os
 import re
 import string
-
-import matplotlib.pyplot as plt
 
 from multispec import *
 
@@ -123,8 +122,13 @@ def chiron_read(thefile, obs=None, src=None):
       ww = numpy.logical_and(numpy.isfinite(snr), snr > 0)
       e_flux[ww] = flux[ww] / snr[ww]
 
-      blaze = im[:,:,5]
-      blaze /= numpy.median(numpy.isfinite(blaze))  # normalize
+      blraw = im[:,:,5]
+
+      # Normalize it to unit median in each order.
+      blmed = numpy.median(blraw, axis=1)
+      blnorm = numpy.where(blmed > 0, 1.0/blmed, 0.0)
+
+      blaze = blraw * blnorm[:,numpy.newaxis]
 
     else:  # Yale
       wave = im[:,:,0]
@@ -146,6 +150,34 @@ def chiron_read(thefile, obs=None, src=None):
     e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0)*gain + xwid*readnois*readnois*gain*gain) / gain
 
     blaze = None  # for now
+
+  if blaze is None:
+    # Attempt to find extracted flat.  For now, we just use one from
+    # the template spectrum night shipped as part of the git repo.
+    if imode == 1:  # slicer
+      blbase = "chi180421.slicerflat.fits"
+    elif imode == 3:  # fiber
+      blbase = "chi180421.fiberflat.fits"
+
+    blfile = os.path.join(os.path.dirname(__file__),
+                          "blaze", "chiron",
+                          blbase)
+
+    if os.path.exists(blfile):
+      blfp = fitsio.FITS(blfile)
+      blmp = blfp[0]
+      
+      blimg = blmp.read().astype(numpy.double)
+
+      # Flat function used to normalize it is in the third plane of the
+      # file, but both axes are reversed, so correct that.
+      blraw = blimg[2,::-1,::-1]
+
+      # Normalize.
+      blmed = numpy.median(blraw, axis=1)
+      blnorm = numpy.where(blmed > 0, 1.0/blmed, 0.0)
+
+      blaze = blraw * blnorm[:,numpy.newaxis]
 
   return bjd, zb, exptime, wave, flux, e_flux, blaze
 
