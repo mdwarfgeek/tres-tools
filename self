@@ -19,8 +19,6 @@ import fftrv
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 
-from scipy.interpolate import InterpolatedUnivariateSpline
-
 from medsig import *
 
 from lsd import *
