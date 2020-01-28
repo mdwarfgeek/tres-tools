@@ -124,16 +124,16 @@ def do_todcor(pdf, tmplaname, tmplbname, filename,
     bmin = tc.ind2vel(ibmin)
     bmax = tc.ind2vel(ibmax)
 
-    plt.subplot(1, 2, 1)
+    plt.subplot(2, 2, 1)
 
-    plt.imshow(hh.T,
-               interpolation='none',
-               extent=[amin, amax, bmax, bmin])
+    m = plt.imshow(hh.T,
+                   interpolation='none',
+                   extent=[amin, amax, bmax, bmin])
+    plt.colorbar(m)
     plt.xlim(amin, amax)
     plt.ylim(bmin, bmax)
     plt.axvline(va, color='white')
     plt.axhline(vb, color='white')
-    plt.xlabel("Primary velocity (km/s)")
     plt.ylabel("Secondary velocity (km/s)")
 
     # Full res around peak.
@@ -150,17 +150,69 @@ def do_todcor(pdf, tmplaname, tmplbname, filename,
     bmin = tc.ind2vel(ibmin)
     bmax = tc.ind2vel(ibmax)
 
-    plt.subplot(1, 2, 2)
+    plt.subplot(2, 2, 2)
 
-    plt.imshow(hh.T,
-               interpolation='none',
-               extent=[amin, amax, bmax, bmin])
+    m = plt.imshow(hh.T,
+                   interpolation='none',
+                   extent=[amin, amax, bmax, bmin])
+    plt.colorbar(m)
+    plt.xlim(amin, amax)
+    plt.ylim(bmin, bmax)
+    plt.axvline(va, color='white')
+    plt.axhline(vb, color='white')
+
+    # Full res around peak.
+    iamin = tc.vel2ind(va) - 64
+    iamax = tc.vel2ind(va) + 64
+    ibmin = tc.vel2ind(vb) - 64
+    ibmax = tc.vel2ind(vb) + 64
+
+    hh = tc.calc(iamin, iamax, 1,
+                 ibmin, ibmax, 1)
+
+    amin = tc.ind2vel(iamin)
+    amax = tc.ind2vel(iamax)
+    bmin = tc.ind2vel(ibmin)
+    bmax = tc.ind2vel(ibmax)
+
+    plt.subplot(2, 2, 3)
+
+    m = plt.imshow(hh.T,
+                   interpolation='none',
+                   extent=[amin, amax, bmax, bmin])
+    plt.colorbar(m)
     plt.xlim(amin, amax)
     plt.ylim(bmin, bmax)
     plt.axvline(va, color='white')
     plt.axhline(vb, color='white')
     plt.xlabel("Primary velocity (km/s)")
     plt.ylabel("Secondary velocity (km/s)")
+
+    # Full res around peak.
+    iamin = tc.vel2ind(va) - 16
+    iamax = tc.vel2ind(va) + 16
+    ibmin = tc.vel2ind(vb) - 16
+    ibmax = tc.vel2ind(vb) + 16
+
+    hh = tc.calc(iamin, iamax, 1,
+                 ibmin, ibmax, 1)
+
+    amin = tc.ind2vel(iamin)
+    amax = tc.ind2vel(iamax)
+    bmin = tc.ind2vel(ibmin)
+    bmax = tc.ind2vel(ibmax)
+
+    plt.subplot(2, 2, 4)
+
+    m = plt.imshow(hh.T,
+                   interpolation='none',
+                   extent=[amin, amax, bmax, bmin])
+    plt.colorbar(m)
+    plt.xlim(amin, amax)
+    plt.ylim(bmin, bmax)
+    plt.axvline(va, color='white')
+    plt.axhline(vb, color='white')
+    plt.xlabel("Primary velocity (km/s)")
 
     pdf.savefig(fig)
     plt.close()
