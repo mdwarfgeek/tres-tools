@@ -815,6 +815,20 @@ chisq = numpy.sum((resid / e_vfit)**2)
 
 print "Final chi squared =", chisq, "ndof =", ndof
 
+veldiff = ymod[0:nobs] - ymod[nobs:2*nobs]
+
+rstr = ""
+
+for vel in veldiff:
+  if vel > 0:
+    rstr += "p"
+  elif vel < 0:
+    rstr += "n"
+  else:
+    rstr += "a"
+
+print "String for todcor -r =", rstr
+
 rmin1 = numpy.min(resid[0:nobs]-e_vfit[0:nobs])
 rmax2 = numpy.max(resid[nobs:2*nobs]+e_vfit[nobs:2*nobs])
 
