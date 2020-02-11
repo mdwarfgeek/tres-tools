@@ -87,7 +87,7 @@ def lsd_multiorder(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
     A = numpy.empty([ nwave, nv ])
 
     # Interpolating spline.
-    spl = InterpolatedUnivariateSpline(thistmpl_wave, thistmpl_flux, k=1)
+    spl = InterpolatedUnivariateSpline(thistmpl_wave, thistmpl_flux, k=3)
 
     for iz, z in enumerate(zvals):
       wanttmpl = thiswave - z*thiswave
