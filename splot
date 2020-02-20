@@ -51,6 +51,7 @@ for filename in args.filelist:
   thiswave = sp.wave[iord,:]
   thisflux = sp.flux[iord,:]
   thise_flux = sp.e_flux[iord,:]
+  thismsk = sp.msk[iord,:]
 
   in_e = False
   in_k = False
@@ -67,12 +68,44 @@ for filename in args.filelist:
 
   line, = plt.plot(thiswave, thisflux, color="black")
   
+  mskspans = []
+
+  def drawmsk():
+    global mskspans
+    
+    for span in mskspans:
+      span.remove()
+
+    mskspans = []
+
+    istart = 0
+
+    while istart < npix:
+      while istart < npix and thismsk[istart]:
+        istart += 1
+
+      if istart < npix:
+        iend = istart+1
+        while iend < npix and not thismsk[iend]:
+          iend += 1
+
+        wl = thiswave[istart]
+        wh = thiswave[iend-1]
+
+        span = plt.axvspan(wl, wh, color="grey", alpha=0.1)
+        mskspans.append(span)
+
+        istart = iend
+      else:
+        break
+
   def chorder():
     global order
     global iord
     global thiswave
     global thisflux
     global thise_flux
+    global thismsk
     global use_pixels
 
     iord = order-1
@@ -87,6 +120,9 @@ for filename in args.filelist:
 
     thisflux = sp.flux[iord,:]
     thise_flux = sp.e_flux[iord,:]
+    thismsk = sp.msk[iord,:]
+
+    drawmsk()
 
     plt.title(filename + " order {0:d}".format(order))
 
@@ -376,6 +412,7 @@ for filename in args.filelist:
         print "Window"
         in_w = True
 
+  drawmsk()
   autoscale()
   
   plt.xlabel("Barycentric wavelength (A)")
