@@ -389,7 +389,7 @@ def plotreg(speclist, tresorder, xmark, xwidth, name, legend, a, b, c):
                fontsize=10)
 
       # BODGE
-      plt.axvspan(xcen-4, xcen+4, alpha=0.05, color="black")
+      plt.axvspan(xcen-3, xcen+3, alpha=0.05, color="black")
 
     #  plt.xlabel("Wavelength (A)")
     #  plt.ylabel("Counts")
@@ -575,23 +575,23 @@ def do_ews(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze,
   if blaze is None:
     blaze = numpy.ones_like(flux)
 
-  # The Halpha continuum regions come from Suarez Mascareno et al. (2015)
-  # which appear to originate in Kurster et al. (2003) except the short
-  # wavelength edge of the short wavelength side continuum band seems to
-  # be shifted by -90 km/s or so making it a bit wider.
+  haline = 6562.808
+  hawid = 6.0
+
   ewha, e_ewha = do_ew(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze,
                        restwave, flux, e_flux, msk, blaze,
-                       6562.808, 8.0, None,
-                       6545.495, 6556.245,
-                       6575.935, 6584.685)
+                       haline, hawid, None,
+                       haline-1.5*hawid, haline-0.5*hawid,
+                       haline+0.5*hawid, haline+1.5*hawid)
 
-  # Ca I 6572.795 might be useful for fixing sky or similar?
-  # Use same continuum regions as for Halpha.
+  caline = 6572.795
+  cawid = 6.0
+
   ewcai, e_ewcai = do_ew(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze,
                          restwave, flux, e_flux, msk, blaze,
-                         6572.795, 8.0, None,
-                         6545.495, 6556.245,
-                         6575.935, 6584.685)
+                         caline, cawid, None,
+                         caline-1.5*cawid, caline-0.5*cawid,
+                         caline+0.5*cawid, caline+1.5*cawid)
 
   # Attempts to find a way to measure Li seem to be epic fail, so far.
 #  ewli, e_ewli = do_ew(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze,
