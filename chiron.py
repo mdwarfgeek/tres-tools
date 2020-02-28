@@ -60,8 +60,11 @@ def chiron_read(thefile, obs=None, src=None):
       ra,rv = lfa.base60_to_10(rastr, ":", lfa.UNIT_HR, lfa.UNIT_RAD)
       de,rv = lfa.base60_to_10(destr, ":", lfa.UNIT_DEG, lfa.UNIT_RAD)
 
+      if equinox == 0:
+        raise RuntimeError("invalid equinox")
+
       if equinox < 1984.0:
-        raise RuntimeError("pre-FK5 equinoxes are not supported")
+        raise NotImplementedError("pre-FK5 equinoxes are not supported")
 
       # Precession matrix ICRS to given equinox.
       pfb = lfa.pfb_matrix(lfa.J2K + (equinox-2000.0) * lfa.JYR)
