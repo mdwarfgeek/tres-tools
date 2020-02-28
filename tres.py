@@ -103,6 +103,10 @@ def tres_read(thefile, obs=None, src=None):
       # Use telescope position from FITS header.  NOT RECOMMENDED!
       rastr = hdr["RA"]
       destr = hdr["DEC"]
+      equinox = float(hdr["EPOCH"])
+
+      if equinox != 2000.0:
+        raise NotImplementedError("precession for epoch {0:f}".format(equinox))
 
       ra,rv = lfa.base60_to_10(rastr, ":", lfa.UNIT_HR, lfa.UNIT_RAD)
       de,rv = lfa.base60_to_10(destr, ":", lfa.UNIT_DEG, lfa.UNIT_RAD)
