@@ -62,6 +62,7 @@ for filename in args.filelist:
   in_x = None
   in_y = None
 
+  use_blaze = False
   use_pixels = False
 
   fig = plt.figure(figsize=figsize)
@@ -106,6 +107,7 @@ for filename in args.filelist:
     global thisflux
     global thise_flux
     global thismsk
+    global use_blaze
     global use_pixels
 
     iord = order-1
@@ -121,6 +123,13 @@ for filename in args.filelist:
     thisflux = sp.flux[iord,:]
     thise_flux = sp.e_flux[iord,:]
     thismsk = sp.msk[iord,:]
+
+    if use_blaze:
+      thisblaze = sp.blaze[iord,:]
+      divb = numpy.where(thisblaze > 0, 1.0/thisblaze, 0.0)
+
+      thisflux = thisflux * divb
+      thise_flux = thise_flux * divb
 
     drawmsk()
 
@@ -172,6 +181,7 @@ for filename in args.filelist:
     global thiswave
     global thisflux
     global thise_flux
+    global use_blaze
     global use_pixels
 
     if in_we:
@@ -383,6 +393,18 @@ for filename in args.filelist:
           chorder()
           autoscale()
           replot()
+
+      elif event.key == "b":
+        use_blaze = not use_blaze
+
+        if use_blaze:
+          plt.ylabel("Deblazed counts")
+        else:
+          plt.ylabel("Counts")
+
+        chorder()
+        autoscale()
+        replot()
 
       elif event.key == "e":
         in_x = event.xdata
