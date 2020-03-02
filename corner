@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+
+import re
+import sys
+
+import numpy
+
+import matplotlib
+
+# Type 42 fonts needed for publication.
+matplotlib.rcParams["pdf.fonttype"] = 42
+matplotlib.rcParams["ps.fonttype"] = 42
+matplotlib.rcParams["figure.subplot.left"] = 0.15
+matplotlib.rcParams["figure.subplot.right"] = 0.85
+matplotlib.rcParams["font.size"] = 14
+
+# Make sure matplotlib doesn't try to use X11 if we're running
+# in non-interactive mode.
+matplotlib.use("Agg")
+
+from matplotlib import pyplot
+
+import corner
+
+if len(sys.argv) < 2:
+  print >>sys.stderr, "Usage:", sys.argv[0], "npzfile [...]"
+  sys.exit(1)
+
+for infile in sys.argv[1:]:
+  outfile = re.sub(r'.np[yz]$', '', infile) + "_corner.pdf"
+
+  arr = numpy.load(infile, allow_pickle=False)
+
+  if isinstance(arr, numpy.lib.npyio.NpzFile):
+    if "ch" in arr:
+      fig = corner.corner(arr["ch"], labels=arr["plist_names"])
+    elif "vder" in arr:
+      fig = corner.corner(arr["vder"], labels=arr["dernames"])
+  else:
+    fig = corner.corner(arr)
+
+  fig.savefig(outfile)
+
+  print "Wrote", outfile
+
+  pyplot.close()
+
+

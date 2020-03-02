@@ -457,8 +457,21 @@ if args.m is not None:
 
   ch = samp.flatchain
 
-#  numpy.savetxt("mcmc.chain.gz", ch)
-  numpy.save(args.m, ch, allow_pickle=False)
+  numpy.savez(args.m,
+              parm=parm,
+              parm_names=parm_names,
+              parm_texsym=parm_texsym,
+              parm_units=parm_units,
+              plist=plist,
+              plist_names=plist_names,
+              plist_texsym=plist_texsym,
+              plist_units=plist_units,
+              fixed=fixed,
+              tbase=tbase,
+              nwalk=nwalk,
+              nburn=nburn,
+              nsim=nsim,
+              ch=ch)
 
   lfp = open(args.m + "_orbit.txt", "w")
   tfp = open(args.m + "_orbit.tex", "w")
@@ -580,6 +593,17 @@ if args.m is not None:
 
     vder[isamp,0:len(dermap)] = thisvder[dermap]
     vder[isamp,len(dermap)] = tperi
+
+  numpy.savez(args.m + "_der",
+              dermap=dermap,
+              dernames=dernames,
+              dertexsym=dertexsym,
+              derunits=derunits,
+              tbase=tbase,
+              nwalk=nwalk,
+              nburn=nburn,
+              nsim=nsim,
+              vder=vder)
 
   print >>lfp, "Derived parameters:"
   print "Derived parameters:"
