@@ -319,15 +319,18 @@ def plotreg(speclist, tresorder, xmark, xwidth, name, legend, a, b, c):
      if best_iord is None:  # no pixels in desired range
        continue
 
-     if not have:
-       have = True
-       plt.subplot(a, b, c)  # init plot
-
      thiswave = wave[best_iord,:]
      thisflux = flux[best_iord,:]
      thisww = ww[best_iord,:]
 
      med = numpy.median(thisflux[thisww])
+
+     if med == 0:  # can't normalize
+       continue
+
+     if not have:
+       have = True
+       plt.subplot(a, b, c)  # init plot
 
      normflux = thisflux[thisww] / med
 
@@ -554,12 +557,15 @@ def do_ew(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk, tmpl_blaze,
     cont = 0.5*(cont1+cont2) * contcorr
     e_cont = 0.5*math.hypot(e_cont1, e_cont2) * contcorr
 
-    ewha, e_ewha = eqwidth(awave, bwave, width, thisflux, thise_flux,
-                           cont, e_cont,
-                           feat_awave, feat_bwave)
+    if cont != 0:
+      ewha, e_ewha = eqwidth(awave, bwave, width, thisflux, thise_flux,
+                             cont, e_cont,
+                             feat_awave, feat_bwave)
 
-    # Report as absorption EW for historical reasons.
-    return -ewha, e_ewha
+      # Report as absorption EW for historical reasons.
+      return -ewha, e_ewha
+    else:
+      return None, None
 
   return None, None
 
