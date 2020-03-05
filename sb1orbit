@@ -56,7 +56,7 @@ import matplotlib.pyplot as plt
 numpy.random.seed(42)
 
 # Build main parameter vector and metadata vectors.
-parm = numpy.zeros(eb.NPAR+5, dtype=numpy.double)
+parm = numpy.zeros(eb.NPAR+6, dtype=numpy.double)
 parm_names = list(eb.parnames)
 parm_texsym = list(eb.partexsym)
 parm_units = list(eb.parunits)
@@ -71,17 +71,22 @@ parm_names.append("gamma_dot")
 parm_texsym.append("\\dot{\\gamma}")
 parm_units.append("km/s/day")
 
-PAR_K1 = eb.NPAR+2
+PAR_DQUAD = eb.NPAR+2
+parm_names.append("gamma_dotdot")
+parm_texsym.append("\\ddot{\\gamma}")
+parm_units.append("km/s/day/day")
+
+PAR_K1 = eb.NPAR+3
 parm_names.append("K1")
 parm_texsym.append("K")
 parm_units.append("km/s")
 
-PAR_S = eb.NPAR+3
+PAR_S = eb.NPAR+4
 parm_names.append("sigma")
 parm_texsym.append("\\sigma")
 parm_units.append("km/s")
 
-PAR_M1 = eb.NPAR+4
+PAR_M1 = eb.NPAR+5
 parm_names.append("M_1")
 parm_texsym.append("M_1")
 parm_units.append("Msol")
@@ -290,7 +295,7 @@ def fit_func (trial, ymod):
     eb.model(ourparm, bjdfit, typ, 0, out=ymod)
 
   ymod *= ourparm[PAR_K1]
-  ymod += ourparm[PAR_GAMMA] + ourparm[PAR_DRIFT]*(bjdfit-ourparm[eb.PAR_T0])
+  ymod += ourparm[PAR_GAMMA] + ourparm[PAR_DRIFT]*(bjdfit-ourparm[eb.PAR_T0]) + ourparm[PAR_DQUAD]*(bjdfit-ourparm[eb.PAR_T0])**2
 
 def vecok (ourparm):
   ecc = math.hypot(ourparm[eb.PAR_ECOSW], ourparm[eb.PAR_ESINW])
@@ -317,7 +322,7 @@ def logpost (trial, x, y, yerr):
     ymod = eb.model(ourparm, x, typ, 0)
 
   ymod *= ourparm[PAR_K1]
-  ymod += ourparm[PAR_GAMMA] + ourparm[PAR_DRIFT]*(x-ourparm[eb.PAR_T0])
+  ymod += ourparm[PAR_GAMMA] + ourparm[PAR_DRIFT]*(x-ourparm[eb.PAR_T0]) + ourparm[PAR_DQUAD]*(x-ourparm[eb.PAR_T0])**2
   
   if args.e:
     wt = 1.0 / (ourparm[PAR_S]**2 + e_v1**2)
@@ -785,7 +790,7 @@ typplot.fill(eb.OBS_VRAD1)
 yplot1 = eb.model(parm, phiplot, typplot, eb.FLAG_PHI)
 yplot1 = parm[PAR_GAMMA] + yplot1 * parm[PAR_K1]
 if args.u:
-  yplot1 += parm[PAR_DRIFT] * phiplot*parm[eb.PAR_P]
+  yplot1 += parm[PAR_DRIFT] * phiplot*parm[eb.PAR_P] + parm[PAR_DQUAD] * (phiplot*parm[eb.PAR_P])**2
 
 fig = plt.figure(figsize=figsize)
 
@@ -794,13 +799,17 @@ plt.subplot(2, 1, 1)
 plt.plot(phiplot, yplot1, color="blue")
 
 if args.double:
-  drift = False
+  drift = 0
   for ipar, jpar in enumerate(plist):
     if jpar == PAR_DRIFT:
-      drift = True
+      if drift < 1:
+        drift = 1
+    if jpar == PAR_DQUAD:
+      if drift < 2:
+        drift = 2
 
-  if drift:
-    coef = numpy.polynomial.polynomial.polyfit(bjd-parm[eb.PAR_T0], v2, 1, full=False, w=hh*hh)
+  if drift > 0:
+    coef = numpy.polynomial.polynomial.polyfit(bjd-parm[eb.PAR_T0], v2, drift, full=False, w=hh*hh)
     mod2 = numpy.polynomial.polynomial.polyval(bjd-parm[eb.PAR_T0], coef)
     mean2 = coef[0]
   else:
@@ -814,34 +823,41 @@ if args.double:
   else:
     tmp = resid2 * hh
     chisq = numpy.sum(tmp*tmp)
-    npar = 1
-    if drift:
-      npar += 1
-    err2 = math.sqrt(chisq / (hh.size-npar))
+    err2 = math.sqrt(chisq / (hh.size-(drift+1)))
 
-  if drift:
-    sgn = "+"
+  if drift > 0:
+    sgn1 = "+"
     if coef[1] < 0:
-      sgn = "-"
-    print "gamma2 =", coef[0], "km/s", sgn, abs(coef[1]), "km/s/day"
+      sgn1 = "-"
+
+    if drift > 1:
+      sgn2 = "+"
+      if coef[2] < 0:
+        sgn2 = "-"
+
+      print "gamma2 =", coef[0], "km/s", sgn1, abs(coef[1]), "km/s/day", sgn2, abs(coef[2]), "km/s/day/day"
+    else:
+      print "gamma2 =", coef[0], "km/s", sgn1, abs(coef[1]), "km/s/day"
   else:
     print "gamma2 =", mean2, "km/s"
 
   print "sigma2 =", err2, "km/s"
 
-  if args.u and drift:
+  if args.u and drift > 0:
     dbjdmin = phimin * parm[eb.PAR_P]
     dbjdmax = phimax * parm[eb.PAR_P]
 
-    plt.plot([phimin, phimax], [ numpy.polynomial.polynomial.polyval(dbjdmin, coef),
-                                 numpy.polynomial.polynomial.polyval(dbjdmax, coef) ], color="green")
+    xxplot = numpy.linspace(phimin, phimax, 1000)
+    yyplot = numpy.polynomial.polynomial.polyval(xxplot * parm[eb.PAR_P], coef)
+
+    plt.plot(xxplot, yyplot, color="green")
   else:
     plt.axhline(mean2, color="green")
 
 if args.u:
   plt.errorbar(phi, vfit, yerr=e_vfit, fmt="o", color="blue")
 else:
-  plt.errorbar(phi, vfit-parm[PAR_DRIFT]*(bjd-parm[eb.PAR_T0]), yerr=e_vfit, fmt="o", color="blue")
+  plt.errorbar(phi, vfit-parm[PAR_DRIFT]*(bjd-parm[eb.PAR_T0])-parm[PAR_DQUAD]*(bjd-parm[eb.PAR_T0])**2, yerr=e_vfit, fmt="o", color="blue")
 
 if args.double:
   if args.u:
