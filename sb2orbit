@@ -59,7 +59,7 @@ pset_lines = []
 with open(args.pset, "r") as fp:
   for line in fp:
     # Remove comments and trim white space.
-    ll = line.split("#", 2)
+    ll = line.split("#", 1)
     ls = ll[0].strip()
 
     if ls == "":
