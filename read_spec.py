@@ -1,5 +1,6 @@
 import numpy
 import os
+import path
 import string
 import warnings
 
@@ -7,6 +8,54 @@ import fitsio
 import lfa
 
 from finterp import *
+
+def getcoords(src_str):
+  # Convert RA, DEC.  Try : first and then space.
+  ss = src_str
+
+  ra, rv = lfa.base60_to_10(ss, ':', lfa.UNIT_HR, lfa.UNIT_RAD)
+  if rv < 0:
+    ra, rv = lfa.base60_to_10(ss, ' ', lfa.UNIT_HR, lfa.UNIT_RAD)
+    if rv < 0:
+      raise RuntimeError("could not understand radec: " + src_str)
+    else:
+      ss = ss[rv:]
+      de, rv = lfa.base60_to_10(ss, ' ', lfa.UNIT_DEG, lfa.UNIT_RAD)
+      if rv < 0:
+        raise RuntimeError("could not understand radec: " + src_str)
+      else:
+        ss = ss[rv:]
+  else:
+    ss = ss[rv:]
+    de, rv = lfa.base60_to_10(ss, ':', lfa.UNIT_DEG, lfa.UNIT_RAD)
+    if rv < 0:
+      raise RuntimeError("could not understand radec: " + src_str)
+    else:
+      ss = ss[rv:]
+
+  # Attempt to split the rest.
+  ll = ss.strip().split()
+
+  pmra = 0
+  pmde = 0
+  plx = 0
+  cat_vrad = 0
+  cat_epoch = 2000.0
+
+  if len(ll) > 0:
+    pmra = float(ll[0])
+  if len(ll) > 1:
+    pmde = float(ll[1])
+  if len(ll) > 2:
+    plx = float(ll[2])
+  if len(ll) > 3:
+    cat_vrad = float(ll[3])
+  if len(ll) > 4:
+    cat_epoch = float(ll[4])
+
+  src = lfa.source(ra, de, pmra, pmde, plx, cat_vrad, cat_epoch)
+
+  return src
 
 def stripname(filespec):
   l = filespec.split(",")
@@ -37,6 +86,65 @@ class read_spec:
     self.multiorder = None
     self.overrideorder = None
     self.qvalues = None
+    self.srclist = None
+
+    if "TRES_TOOLS_SRCLIST" in os.environ:
+      # Use environment variable.
+      srcfile = os.environ["TRES_TOOLS_SRCLIST"]
+      self.read_srclist(srcfile)
+    else:
+      # Try to find one by walking back up the filesystem from
+      # the current directory.
+      here = os.path.realpath(os.getcwd())
+      srcfile = None
+
+      while True:
+        tstfile = os.path.join(here, "source.cat")
+        if os.path.exists(tstfile):
+          srcfile = tstfile
+          break
+
+        head, tail = os.path.split(here)
+
+        # Normal exit condition when we reach filesystem root.
+        if tail == "":
+          break
+
+        # This shouldn't happen but just in case to prevent
+        # infinite loops we check for them here.
+        if here == head:
+          break
+
+        here = head
+        
+      if srcfile is not None:
+        self.read_srclist(srcfile)
+      else:
+        warnings.warn("no source list")
+
+  def read_srclist(self, catfile):
+    self.srclist = {}
+
+    with open(catfile, "r") as fp:
+      for line in fp:
+        # Remove comments and trim white space.
+        ll = line.split("#", 1)
+        ls = ll[0].strip()
+
+        if ls == "":
+          continue
+
+        # Extract object name.
+        lo = ls.split(None, 1)
+        if len(lo) != 2:
+          raise RuntimeError("could not understand: " + line)
+
+        objname, rest = lo
+
+        key = objname.upper()
+        src = getcoords(rest)
+
+        self.srclist[key] = src
 
   def read_spec(self, filespec, src=None, src_str=None, istmpl=False, wantstruct=False, doreject=True):
     # Convert file specification from script argument into a file list.
@@ -58,52 +166,9 @@ class read_spec:
 
     nspec = len(filelist)
 
-    # Extract source structure from catalogue information, if given.
+    # Extract source structure from srclist information, if given.
     if src is None and src_str is not None:
-      # Convert RA, DEC.  Try : first and then space.
-      ss = src_str
-
-      ra, rv = lfa.base60_to_10(ss, ':', lfa.UNIT_HR, lfa.UNIT_RAD)
-      if rv < 0:
-        ra, rv = lfa.base60_to_10(ss, ' ', lfa.UNIT_HR, lfa.UNIT_RAD)
-        if rv < 0:
-          raise RuntimeError("could not understand radec: " + src_str)
-        else:
-          ss = ss[rv:]
-          de, rv = lfa.base60_to_10(ss, ' ', lfa.UNIT_DEG, lfa.UNIT_RAD)
-          if rv < 0:
-            raise RuntimeError("could not understand radec: " + src_str)
-          else:
-            ss = ss[rv:]
-      else:
-        ss = ss[rv:]
-        de, rv = lfa.base60_to_10(ss, ':', lfa.UNIT_DEG, lfa.UNIT_RAD)
-        if rv < 0:
-          raise RuntimeError("could not understand radec: " + src_str)
-        else:
-          ss = ss[rv:]
-
-      # Attempt to split the rest.
-      ll = ss.strip().split()
-
-      pmra = 0
-      pmde = 0
-      plx = 0
-      cat_vrad = 0
-      cat_epoch = 2000.0
-
-      if len(ll) > 0:
-        pmra = float(ll[0])
-      if len(ll) > 1:
-        pmde = float(ll[1])
-      if len(ll) > 2:
-        plx = float(ll[2])
-      if len(ll) > 3:
-        cat_vrad = float(ll[3])
-      if len(ll) > 4:
-        cat_epoch = float(ll[4])
-
-      src = lfa.source(ra, de, pmra, pmde, plx, cat_vrad, cat_epoch)
+      src = getcoords(src_str)
 
     # Use first file for setup.
     fp = fitsio.FITS(filelist[0], 'r')
@@ -111,6 +176,22 @@ class read_spec:
     mp = fp[0]
     hdr = mp.read_header()
     
+    # Object name.
+    if "OBJECT" in hdr:
+      objname = str(hdr["OBJECT"]).strip()
+
+      # If we have one, and we don't have coords for this source yet,
+      # try to look it up in the source list.
+      if src is None and self.srclist is not None:
+        key = objname.upper()
+
+        if key in self.srclist:
+          src = self.srclist[key]
+        else:
+          warnings.warn("object " + objname + " not found in srclist")
+    else:
+      objname = None
+
     # Try to detect the instrument.
     specname = None
     mode = None
