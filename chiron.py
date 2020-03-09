@@ -4,6 +4,7 @@ import numpy
 import os
 import re
 import string
+import warnings
 
 from multispec import *
 
@@ -51,32 +52,33 @@ def chiron_read(thefile, obs=None, src=None):
   fmidexp = exptime * 0.5 / lfa.DAY
 
   if obs is not None:
+    # Telescope position from FITS header.
+    rastr = str(hdr["RA"]).strip()
+    destr = str(hdr["DEC"]).strip()
+    equinox = float(hdr["EPOCH"])
+
+    ra,rv = lfa.base60_to_10(rastr, ":", lfa.UNIT_HR, lfa.UNIT_RAD)
+    de,rv = lfa.base60_to_10(destr, ":", lfa.UNIT_DEG, lfa.UNIT_RAD)
+
+    if equinox == 0:
+      raise RuntimeError("invalid equinox")
+
+    if equinox < 1984.0:
+      raise NotImplementedError("pre-FK5 equinoxes are not supported")
+
+    # Precession matrix ICRS to given equinox.
+    pfb = lfa.pfb_matrix(lfa.J2K + (equinox-2000.0) * lfa.JYR)
+
+    # Apply inverse transformation to star coordinates.
+    vec_eq = lfa.ad_to_v(ra, de)
+    vec_icrs = numpy.dot(pfb.T, vec_eq)  # noting transpose
+
+    # Null velocity vector.
+    vel_icrs = numpy.zeros([3])
+
+    # If no override given
     if src is None:
-      # Use telescope position from FITS header.  NOT RECOMMENDED!
-      rastr = hdr["RA"]
-      destr = hdr["DEC"]
-      equinox = float(hdr["EPOCH"])
-
-      ra,rv = lfa.base60_to_10(rastr, ":", lfa.UNIT_HR, lfa.UNIT_RAD)
-      de,rv = lfa.base60_to_10(destr, ":", lfa.UNIT_DEG, lfa.UNIT_RAD)
-
-      if equinox == 0:
-        raise RuntimeError("invalid equinox")
-
-      if equinox < 1984.0:
-        raise NotImplementedError("pre-FK5 equinoxes are not supported")
-
-      # Precession matrix ICRS to given equinox.
-      pfb = lfa.pfb_matrix(lfa.J2K + (equinox-2000.0) * lfa.JYR)
-
-      # Apply inverse transformation to star coordinates.
-      vec_eq = lfa.ad_to_v(ra, de)
-      vec_icrs = numpy.dot(pfb.T, vec_eq)  # noting transpose
-
-      # Null velocity vector.
-      vel_icrs = numpy.zeros([3])
-
-      # Form source structure.
+      # Use position from FITS header.  NOT RECOMMENDED!
       src = lfa.source_star_vec(vec_icrs, vel_icrs)
 
     # TT-UTC at start.
@@ -89,6 +91,16 @@ def chiron_read(thefile, obs=None, src=None):
 
     # Compute current BCRS position.
     (s, dsdt, pr) = obs.place(src, lfa.TR_MOTION)
+
+    # Check it against the header for large errors.
+    sep = lfa.v_angle_v(s, vec_icrs)
+
+    if abs(sep) > 300.0 * lfa.AS_TO_RAD:
+      sra, sde = lfa.v_to_ad(s)
+      if sra < 0:
+        sra += lfa.TWOPI
+
+      warnings.warn("large coordinate error: cat {0:s} {1:s} vs file {2:s} {3:s} {4:.1f}".format(lfa.base10_to_60(sra, lfa.UNIT_RAD, ":", "", 3, lfa.UNIT_HR), lfa.base10_to_60(sde, lfa.UNIT_RAD, ":", "+", 2, lfa.UNIT_DEG), rastr, destr, equinox), stacklevel=2)
 
     # Delay
     delay = obs.bary_delay(s, pr)
