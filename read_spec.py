@@ -1,6 +1,5 @@
 import numpy
 import os
-import path
 import string
 import warnings
 
