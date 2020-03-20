@@ -110,9 +110,7 @@ Support routines found in "pymisc" also on this account (these need to
 be available in the Python search path, e.g. PYTHONPATH).
 
 Orbit fitting programs also require my "eb" module, and period finding
-my "sfit" module; the latter isn't yet available but these are nothing
-particularly special for this purpose and a standard period finder may
-be substituted.
+my "sfit" module.
 
 For our use we have usually resorted to creating a virtual environment
 using "virtualenv" and installing everything inside it to avoid
