@@ -50,6 +50,13 @@ def tres_find_blaze(utc):
   if len(gg) > 0:
     return gg[0]
 
+  # Use generic one included in git repo.
+  gg = glob.glob(os.path.join(os.path.dirname(__file__),
+                              "blaze", "tres", "*.blaze.spec.fits"))
+
+  if len(gg) > 0:
+    return gg[0]
+
   return None
 
 def tres_read(thefile, obs=None, src=None):
