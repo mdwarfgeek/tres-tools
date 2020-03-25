@@ -19,6 +19,7 @@ ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @l
 ap.add_argument("-c", metavar="ra dec pmra pmdec plx vrad epoch", type=str, help="specify catalogue information for target")
 ap.add_argument("-o", type=int, help="plot order")
 ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
+ap.add_argument("-s", action="store_true", help="shift to rest wavelength of star using VELOCITY")
 
 if len(sys.argv) == 1:
   ap.print_help(sys.stderr)
@@ -40,7 +41,7 @@ if args.o is not None:
   rs.overrideorder = args.o
 
 for filename in args.filelist:
-  sp = rs.read_spec(filename, src_str=args.c, wantstruct=True, doreject=not args.R)
+  sp = rs.read_spec(filename, src_str=args.c, wantstruct=True, doreject=not args.R, istmpl=args.s)
 
   nord, npix = sp.wave.shape
 
@@ -118,7 +119,11 @@ for filename in args.filelist:
 
     else:
       thiswave = sp.wave[iord,:]
-      plt.xlabel("Barycentric wavelength (A)")
+
+      if args.s:
+        plt.xlabel("Rest wavelength (A)")
+      else:
+        plt.xlabel("Barycentric wavelength (A)")
 
     thisflux = sp.flux[iord,:]
     thise_flux = sp.e_flux[iord,:]
@@ -436,8 +441,12 @@ for filename in args.filelist:
 
   drawmsk()
   autoscale()
-  
-  plt.xlabel("Barycentric wavelength (A)")
+
+  if args.s:
+    plt.xlabel("Rest wavelength (A)")
+  else:
+    plt.xlabel("Barycentric wavelength (A)")
+
   plt.ylabel("Counts")
 
   plt.title(filename + " order {0:d}".format(order))
