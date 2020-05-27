@@ -373,7 +373,7 @@ def plotreg(speclist, tresorder, xmark, xwidth, name, legend, a, b, c):
     plt.ylim(ymin-0.05*totyr, ymin+1.2*totyr)
     
     plt.locator_params(nbins=5)
-    plt.tick_params(axis="y", which="both", labelleft="off")
+    plt.tick_params(axis="y", which="both", labelleft=False)
     
     ax = plt.gca()
     ax.ticklabel_format(useOffset=False)
