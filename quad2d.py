@@ -16,7 +16,7 @@ def quad2d(xx, yy, zz):
   A[:,4] = y * y
   A[:,5] = x * y
 
-  c, chisq, rank, s = numpy.linalg.lstsq(A, z, rcond=None)
+  c, chisq, rank, s = numpy.linalg.lstsq(A, z, rcond=-1)
 
   # Location of extremum.
   xbest = (2*c[1]*c[4] - c[3]*c[5]) / (c[5]*c[5] - 4*c[2]*c[4])

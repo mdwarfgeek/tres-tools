@@ -21,7 +21,7 @@ def quad3d(xx, yy, zz, hh):
   A[:,8] = x * z
   A[:,9] = y * z
 
-  c, chisq, rank, s = numpy.linalg.lstsq(A, h, rcond=None)
+  c, chisq, rank, s = numpy.linalg.lstsq(A, h, rcond=-1)
 
   # Location of extremum by solving matrix equation.  This is a bit
   # lazy, probably should do the analytic solution, but I doubt it

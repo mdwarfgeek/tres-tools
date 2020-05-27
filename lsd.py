@@ -103,6 +103,6 @@ def lsd_multiorder(tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
   # Regularization.
   AA += kreg * numpy.identity(nv)  # need to calculate this constant properly
 
-  prof, chisq, rank, s = numpy.linalg.lstsq(AA, bb, rcond=None)
+  prof, chisq, rank, s = numpy.linalg.lstsq(AA, bb, rcond=-1)
 
   return vels, prof
