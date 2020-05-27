@@ -160,6 +160,7 @@ def do_vrad(pdf, tmplname, filename,
   if dovsini:
     plt.plot(l_vsini, l_p)
     plt.axvline(vsini)
+    plt.xlim(l_vsini[0], l_vsini[-1])
     plt.xlabel("vsini (km/s)")
     plt.ylabel("Correlation^2")
     plt.title("{0:s}".format(filename))
