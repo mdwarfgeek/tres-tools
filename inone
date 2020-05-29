@@ -26,6 +26,7 @@ from lsd import *
 from makesky import *
 from prepord import *
 from read_spec import *
+from vsini import *
 
 # Constants used by the script go here.
 
@@ -79,43 +80,27 @@ def do_vrad(pdf, tmplname, filename,
     # Figure out vsini first.
     frv = fftrv.fftrv(nbin=32*npix, pkfit=0,
                       t_emchop=emchop, s_emchop=emchop)
-    
-    nvsini = 101
-    
-    l_vsini = numpy.empty([nvsini])
-    l_zbest = numpy.empty([nvsini])
-    l_c = numpy.empty([nvsini])
-    l_p = numpy.empty([nvsini])
-    
-    for ivsini in range(nvsini):
-      vsini = float(ivsini)
-      
-      z, corr, zbest, hbest, sigt = frv.correlate(thistmpl_wave, thistmpl_flux,
-                                                  thiswave, thisflux,
-                                                  vsini*1000 / lfa.LIGHT,
-                                                  ald, bld)
-      
-      # Normalised (-chisq) like quantity.
-      p = hbest*hbest
 
-      l_vsini[ivsini] = vsini
-      l_zbest[ivsini] = zbest
-      l_c[ivsini] = hbest
-      l_p[ivsini] = p
-      
-    ibest = numpy.argmax(l_p)
-    pbest = l_p[ibest]
-      
-    if ibest > 0 and ibest < len(l_p)-1:
-      aa = l_p[ibest]
-      bb = 0.5*(l_p[ibest+1] - l_p[ibest-1])
-      cc = 0.5*(l_p[ibest+1] + l_p[ibest-1] - 2.0*aa)
-      offset = -0.5*bb/cc
-    else:
-      offset = 0
-    
-    vsini = ibest+offset
+    initvsini, l_vsini, l_p = do_vsini_grid(frv,
+                                            thistmpl_wave, thistmpl_flux,
+                                            thiswave, thisflux,
+                                            ald, bld,
+                                            0, 100, 101)
 
+    avsini = initvsini - 1.0
+    if avsini < 0.0:
+      avsini = 0.0
+
+    bvsini = avsini + 2.0
+
+    newvsini, r_vsini, r_p = do_vsini_grid(frv,
+                                           thistmpl_wave, thistmpl_flux,
+                                           thiswave, thisflux,
+                                           ald, bld,
+                                           avsini, bvsini, 21)
+
+    vsini = newvsini
+    
   usevsini = vsini
 
   # Correlate.

@@ -1,0 +1,218 @@
+#!/usr/bin/env python
+
+import argparse
+import math
+import os
+import re
+import sys
+
+import numpy
+
+import lfa
+
+# Stop pyplot trying to use X.
+import matplotlib
+matplotlib.use('Agg')
+
+import fftrv
+
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
+
+from medsig import *
+
+from makesky import *
+from prepord import *
+from read_spec import *
+from vsini import *
+
+# Constants used by the script go here.
+
+# Figure size based on pgplot.
+figsize = (10.5, 7.8)  # inches
+
+# Limb darkening coefficients for rotational broadening kernel.
+# These are from Phoenix mod. atm. for Teff=3224K, logg=5, Rc band,
+# least-squares method, Claret et al. (2012) 2012A&A...546A..14C
+ald = 0.4629
+bld = 0.3212
+
+def do_multi_vsini(pdf, tmplname, filename,
+                   tmpl_mbjd, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk,
+                   mbjd, wave, flux, e_flux, msk,
+                   orders, emchop=True):
+  l_vsini = numpy.empty_like(orders, dtype=numpy.double)
+  l_corr = numpy.empty_like(orders, dtype=numpy.double)
+
+  fig = None
+  
+  for ii, order in enumerate(orders):
+    # Extract order and clean.
+    thistmpl_wave, thistmpl_flux, thistmpl_e_flux = prepord(order, tmpl_wave, tmpl_flux, tmpl_e_flux, tmpl_msk)
+    thiswave, thisflux, thise_flux = prepord(order, wave, flux, e_flux, msk)
+
+    tmpl_emmask = numpy.isfinite(thistmpl_flux)
+    emmask = numpy.isfinite(thisflux)
+    
+    if emchop:
+      medflux, sigflux = medsig(thistmpl_flux[tmpl_emmask])
+      tmpl_emmask = numpy.logical_and(tmpl_emmask,
+                                      thistmpl_flux < medflux + 5.0*sigflux)
+      
+      medflux, sigflux = medsig(thisflux[emmask])
+      emmask = numpy.logical_and(emmask,
+                                 thisflux < medflux + 5.0*sigflux)
+
+    # Take off sky.
+    ss = makesky(thistmpl_wave, thistmpl_flux, 4)
+    
+    thistmpl_flux -= ss
+    
+    ss = makesky(thiswave, thisflux, 4)
+    
+    thisflux -= ss
+
+    # Number of measurements (pixels).
+    npix = len(thisflux)
+
+    # Correlate.
+    frv = fftrv.fftrv(nbin=32*npix, pkfit=0,
+                      t_emchop=emchop, s_emchop=emchop)
+
+    initvsini, i_vsini, i_p = do_vsini_grid(frv,
+                                            thistmpl_wave, thistmpl_flux,
+                                            thiswave, thisflux,
+                                            ald, bld,
+                                            0, 100, 101)
+
+    avsini = initvsini - 1.0
+    if avsini < 0:
+      avsini = 0
+
+    bvsini = avsini + 2.0
+
+    vsini, r_vsini, r_p = do_vsini_grid(frv,
+                                        thistmpl_wave, thistmpl_flux,
+                                        thiswave, thisflux,
+                                        ald, bld,
+                                        avsini, bvsini, 21)
+
+    z, corr, zbest, hbest, sigt = frv.correlate(thistmpl_wave, thistmpl_flux,
+                                                thiswave, thisflux,
+                                                vsini*1000 / lfa.LIGHT,
+                                                ald, bld)
+
+    if fig is None:
+      fig = plt.figure(figsize=figsize)
+      plt.subplot(2, 1, 1)
+    else:
+      plt.subplot(2, 1, 2)
+      
+    plt.plot(i_vsini, i_p, color="black", label="Order {0:d}".format(order))
+    plt.plot(r_vsini, r_p, color="red")
+    plt.axvline(vsini, color="red", label="{0:.2f} km/s".format(vsini))
+    plt.xlim(i_vsini[0], i_vsini[-1])
+    plt.xlabel("vsini (km/s)")
+    plt.ylabel("$h^2$")
+    plt.legend()
+    
+    if ii % 2 == 1:
+      pdf.savefig(fig)
+      plt.close()
+      fig = None
+    
+    l_vsini[ii] = vsini
+    l_corr[ii] = hbest
+
+  nord = len(orders)
+
+  # Mean of orders, unweighted.
+  mean_vsini = numpy.mean(l_vsini)
+  sig_vsini = numpy.std(l_vsini, ddof=1)
+  e_mean_vsini = sig_vsini / math.sqrt(nord)
+
+  # Order plot.
+  if fig is None:
+    fig = plt.figure(figsize=figsize)
+    plt.subplot(2, 1, 1)
+  else:
+    plt.subplot(2, 1, 2)
+
+  plt.xlim(orders[0]-1, orders[-1]+1)
+  plt.fill_between(plt.xlim(),
+                   mean_vsini-sig_vsini, mean_vsini+sig_vsini,
+                   color='grey', alpha=0.25)
+    
+  plt.plot(orders, l_vsini, "o", color="black")
+  plt.axhline(mean_vsini, color="black", label="${0:.2f} \pm {1:.2f}$ km/s".format(mean_vsini, e_mean_vsini))
+
+  plt.xlabel("Aperture number")
+  plt.ylabel("vsini (km/s)")
+  plt.legend()
+  
+  pdf.savefig(fig)
+  plt.close()
+  
+  return mean_vsini, e_mean_vsini, l_vsini, l_corr
+
+ap = argparse.ArgumentParser()
+ap.add_argument("template", help="template spectrum file or @list of files to be stacked")
+ap.add_argument("filelist", metavar="file", nargs="+", help="spectrum file or @list of files to be stacked")
+ap.add_argument("-c", metavar="ra dec pmra pmdec plx vrad epoch", type=str, help="specify catalogue information for target")
+ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
+ap.add_argument("-o", type=int, help="override order number used for analysis")
+ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
+
+if len(sys.argv) == 1:
+  ap.print_help(sys.stderr)
+  sys.exit(1)
+
+args = ap.parse_args()
+
+# New read_spec structure.
+rs = read_spec()
+
+if args.o is not None:
+  rs.overrideorder = args.o
+
+emchop = not args.E
+
+# Read template.
+tmplsp = rs.read_spec(args.template, istmpl=1, wantstruct=True, doreject=not args.R)
+
+tmplname = stripname(args.template)
+
+filelist = args.filelist
+nf = len(args.filelist)
+
+for ifile, filename in enumerate(filelist):
+  sp = rs.read_spec(filename, src_str=args.c, wantstruct=True, doreject=not args.R)
+
+  targname = re.sub(r'_cb\.spec$', "", stripname(filename))
+
+  basefile = stripname(filename)
+  outfile = basefile + "_vsini.pdf"
+
+  pdf = PdfPages(outfile)
+
+  # Velocity.
+  multiorders = rs.multiorder
+  if args.o is not None:
+    multiorders = [ args.o ]
+
+  mean_vsini, e_mean_vsini, l_vsini, l_corr = do_multi_vsini(pdf, tmplname, targname,
+                                                             tmplsp.mbjd, tmplsp.wave, tmplsp.flux, tmplsp.e_flux, tmplsp.msk,
+                                                             sp.mbjd, sp.wave, sp.flux, sp.e_flux, sp.msk,
+                                                             orders=multiorders, emchop=emchop)
+
+  pdf.close()
+
+  print "{0:s} {1:12.4f} {2:5.2f} {3:5.2f} {4:7.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vsini, e_mean_vsini, sp.exptime),
+
+  for iord in range(len(multiorders)):
+    print " {0:2d} {1:5.2f} {2:8.6f}".format(multiorders[iord], l_vsini[iord], l_corr[iord]),
+
+  print
+
+sys.exit(0)
+
