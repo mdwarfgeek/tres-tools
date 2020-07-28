@@ -210,6 +210,8 @@ tmplname = stripname(args.template)
 filelist = args.filelist
 nf = len(args.filelist)
 
+donehdr = False
+
 for ifile, filename in enumerate(filelist):
   sp = rs.read_spec(filename, src_str=args.c, wantstruct=True, doreject=not args.R)
 
@@ -233,6 +235,25 @@ for ifile, filename in enumerate(filelist):
 
 #  pdf.close()
 
+  if not donehdr:
+    ss = "#Filename"
+    lf = len(ss)
+    lt = len(filename)
+
+    if lt > lf:
+      ss += " " * (lt-lf)
+
+    print ss,
+      
+    print "BJD-TDB      mean_vrad e_mean  exptime vsini",
+    
+    for iord in range(len(l_vrad)):
+      print " ap vrad      e_vrad  h       ",
+      
+    print
+
+    donehdr = True
+    
   print "{0:s} {1:12.4f} {2:9.4f} {3:7.4f} {4:7.2f} {5:5.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vrad, e_mean_vrad, sp.exptime, usevsini),
 
   for iord in range(len(l_vrad)):

@@ -283,6 +283,8 @@ def do_optimize(filelist, targlist, restrictlist, optlist, init_parm):
 def do_fixed(filelist, targlist, restrictlist, parm, dopdf=False):
   ssqh = 0
 
+  donehdr = False
+  
   for ifile, filename in enumerate(filelist):
     sp = targlist[ifile]
     
@@ -307,7 +309,12 @@ def do_fixed(filelist, targlist, restrictlist, parm, dopdf=False):
     
     if pdf is not None:
       pdf.close()
-    
+
+    if not donehdr:
+      print "#BJD-TDB     vrad1    vrad2    h         exptime"
+
+      donehdr = True
+      
     print "{0:12.4f} {1:8.3f} {2:8.3f} {3:9.6f} {4:7.2f}".format(lfa.ZMJD+sp.mbjd, xbest, ybest, hbest, sp.exptime)
 
     ssqh += hbest*hbest

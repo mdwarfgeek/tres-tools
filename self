@@ -476,6 +476,8 @@ if nspec > 2 and not args.S:
   is_stack = True
 
 # Main correlation loop.
+donehdr = False
+
 for ispec, sp in enumerate(speclist):
   if ispec == 0 and not is_stack:
     continue
@@ -508,6 +510,25 @@ for ispec, sp in enumerate(speclist):
 
   pdf.close()
 
+  if not donehdr:
+    ss = "#Filename"
+    lf = len(ss)
+    lt = len(filename)
+
+    if lt > lf:
+      ss += " " * (lt-lf)
+
+    print ss,
+      
+    print "BJD-TDB      mean_vrad e_mean  exptime",
+    
+    for iord in range(len(l_vrad)):
+      print " ap vrad      h       ",
+      
+    print
+
+    donehdr = True
+  
   print "{0:s} {1:12.4f} {2:9.4f} {3:7.4f} {4:7.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vrad, e_mean_vrad, sp.exptime),
 
   for iord in range(len(l_vrad)):

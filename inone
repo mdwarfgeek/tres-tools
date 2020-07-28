@@ -640,6 +640,8 @@ tmplname = stripname(args.template)
 filelist = args.filelist
 nf = len(args.filelist)
 
+donehdr = False
+
 for ifile, filename in enumerate(filelist):
   sp = rs.read_spec(filename, src_str=args.c, wantstruct=True, doreject=not args.R)
 
@@ -697,6 +699,18 @@ for ifile, filename in enumerate(filelist):
 
   pdf.close()
 
+  if not donehdr:
+    ss = "#Filename"
+    lf = len(ss)
+    lt = len(filename)
+
+    if lt > lf:
+      ss += " " * (lt-lf)
+
+    print(ss + " BJD-TDB      vrad     h         exptime vsini ewha     e_ewha ewca    e_ewca")
+    
+    donehdr = True
+  
   if ewha is not None and ewcai is not None:
     print("{0:s} {1:12.4f} {2:8.3f} {3:9.6f} {4:7.2f} {5:5.2f} {6:8.4f} {7:6.4f} {8:7.4f} {9:6.4f}".format(filename, lfa.ZMJD+sp.mbjd, vrad, hbest, sp.exptime, vsinibest, ewha, e_ewha, ewcai, e_ewcai))
   else:
