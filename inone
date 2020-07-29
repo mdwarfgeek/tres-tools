@@ -611,6 +611,7 @@ ap.add_argument("-c", metavar="ra dec pmra pmdec plx vrad epoch", type=str, help
 ap.add_argument("-E", action="store_true", help="don't remove emission lines from spectrum")
 ap.add_argument("-f", action="store_true", help="save correlations and LSDs to ascii files")
 ap.add_argument("-o", type=int, help="override order number used for analysis")
+ap.add_argument("-p", help="set plot filename suffix (default inone)")
 ap.add_argument("-R", action="store_true", help="don't use cosmic rejection when stacking")
 ap.add_argument("-r", metavar="vsini", type=float, help="use fixed rotation for final velocity analysis")
 ap.add_argument("-w", type=get_range, default=None, help="set wavelength range -w='min:max' in A")
@@ -627,6 +628,11 @@ rs = read_spec()
 if args.o is not None:
   rs.overrideorder = args.o
 
+if args.p is not None:
+  plotsuffix = args.p
+else:
+  plotsuffix = "inone"
+  
 emchop = not args.E
 
 # Read template.
@@ -649,7 +655,7 @@ for ifile, filename in enumerate(filelist):
     sp.msk = numpy.logical_and(sp.wave >= args.w[0], sp.wave < args.w[1])
 
   basefile = stripname(filename)
-  outfile = basefile + "_inone.pdf"
+  outfile = basefile + "_" + plotsuffix + ".pdf"
 
   pdf = PdfPages(outfile)
 
