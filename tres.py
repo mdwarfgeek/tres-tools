@@ -216,8 +216,14 @@ def tres_read(thefile, obs=None, src=None):
   flux = mp.read().astype(numpy.double)
 
   # Trim off extra dimensions (if extracted using IRAF).
+  e_flux = None
+  
   if flux.ndim > 2:
-    flux = flux[1,:,:]
+    # Extract uncertainty.
+    if flux.shape[0] >= 4:
+      e_flux = flux[3,:,:]
+    
+    flux = flux[0,:,:]
 
   # Compute wavelengths.
   nord, nwave = flux.shape
@@ -225,7 +231,8 @@ def tres_read(thefile, obs=None, src=None):
   wave = multispec_lambda(hdr, nord, nwave)
 
   # Compute uncertainties.
-  e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0)*gain + xwid*readnois*readnois) / gain
+  if e_flux is None:
+    e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0)*gain + xwid*readnois*readnois) / gain
 
   # Read blaze.
   if blfile is not None:
@@ -236,7 +243,7 @@ def tres_read(thefile, obs=None, src=None):
 
     # Trim off extra dimensions (if extracted using IRAF).
     if blaze.ndim > 2:
-      blaze = blaze[1,:,:]
+      blaze = blaze[0,:,:]
   else:
     blaze = None
 
