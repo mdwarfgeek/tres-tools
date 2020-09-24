@@ -207,10 +207,16 @@ def tres_read(thefile, obs=None, src=None):
     bjd = None
     zb = None
 
+  # Number of exposures stacked.
+  if "WS_ORG_N" in hdr:
+    nfiles = int(hdr["WS_ORG_N"])
+  else:
+    nfiles = 1
+    
   # Gain and read noise.
-  gain = 1.06
-  readnois = 4.2
-  xwid = 3  # a guess, it actually uses profile weighted extraction
+  gain     = 1.06
+  readnois = 2.92 * numpy.sqrt(nfiles)
+  xwid     = 4.5  # effective aperture size at faint end (read noise limited)
 
   # Read spectrum, converting to double.
   flux = mp.read().astype(numpy.double)
