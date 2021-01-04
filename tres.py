@@ -27,28 +27,28 @@ def tres_obs():
   return obs
 
 def tres_find_blaze(utc):
-  # Longitude as fraction of full circle / day.
-  longmjd = -399163.5 / (3600.0 * 360.0)
-
-  # Local time as MJD.
-  locmjd = utc + longmjd
-
-  # MJD number of previous mid-day.
-  midday = int(locmjd-0.5)
-
-  # Convert to Gregorian.
-  yr, mn, dy = lfa.mjd2date(midday)
-
-  # Formatted string as used by pipeline.
-  nightstr = "{0:04d}-{1:02d}-{2:02d}".format(yr, mn, dy)
-
-  # Try to locate it.
-  path = os.path.join("/home/tres/tred/", nightstr, "repackBlaze")
-
-  gg = glob.glob(os.path.join(path, "*.blaze.spec.fits"))
-  
-  if len(gg) > 0:
-    return gg[0]
+#  # Longitude as fraction of full circle / day.
+#  longmjd = -399163.5 / (3600.0 * 360.0)
+#
+#  # Local time as MJD.
+#  locmjd = utc + longmjd
+#
+#  # MJD number of previous mid-day.
+#  midday = int(locmjd-0.5)
+#
+#  # Convert to Gregorian.
+#  yr, mn, dy = lfa.mjd2date(midday)
+#
+#  # Formatted string as used by pipeline.
+#  nightstr = "{0:04d}-{1:02d}-{2:02d}".format(yr, mn, dy)
+#
+#  # Try to locate it.
+#  path = os.path.join("/home/tres/tred/", nightstr, "repackBlaze")
+#
+#  gg = glob.glob(os.path.join(path, "*.blaze.spec.fits"))
+#  
+#  if len(gg) > 0:
+#    return gg[0]
 
   # Use generic one included in git repo.
   gg = glob.glob(os.path.join(os.path.dirname(__file__),
