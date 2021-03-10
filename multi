@@ -77,12 +77,9 @@ def calcq(wave, flux, mask, vsini):
   ww = numpy.logical_and(mask, flux > 0)
   
   fnorm = flux / numpy.mean(flux[ww])
-  d = (fnorm[1:npix] - fnorm[0:npix-1]) / (wave[1:npix] - wave[0:npix-1])
-  m = (wave[1:npix] / fnorm[1:npix]) * d
-  qvec = fnorm[1:npix] * m*m
-  
-  ww = numpy.logical_and(numpy.logical_and(mask[1:npix], mask[0:npix-1]),
-                         numpy.logical_and(flux[1:npix] > 0, flux[0:npix-1] > 0))
+  d = numpy.gradient(fnorm, wave)
+  m = (wave / numpy.where(fnorm > 0, fnorm, 1)) * d
+  qvec = fnorm * m*m
   
   q = math.sqrt(numpy.mean(qvec[ww]))
 
