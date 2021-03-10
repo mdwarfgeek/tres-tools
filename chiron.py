@@ -117,10 +117,10 @@ def chiron_read(thefile, obs=None, src=None):
   # Gain and read noise.
   if "GAIN" in hdr:  # Yale pipeline
     gain = float(hdr['GAIN'])
-    readnois = float(hdr['RON'])  # bizarrely, seems to be in ADU
+    readnois = float(hdr['RON'])
   else:  # Use amp 1 (all the same anyway).
     gain = float(hdr['GAIN11'])
-    readnois = float(hdr['RON11'])  # bizarrely, seems to be in ADU
+    readnois = float(hdr['RON11'])
 
   # Get extraction window size.
   if "MODE" in hdr:
@@ -162,10 +162,9 @@ def chiron_read(thefile, obs=None, src=None):
 
     else:  # Yale
       wave = im[:,:,0]
-      flux = im[:,:,1]  # spectrum is in ADU
+      flux = im[:,:,1]  # spectrum is in electrons
 
-      # N.B. read noise seems to be in ADU.
-      e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0)*gain + xwid*readnois*readnois*gain*gain) / gain
+      e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0) + xwid*readnois*readnois)
 
       blaze = None  # for now
 
@@ -176,8 +175,7 @@ def chiron_read(thefile, obs=None, src=None):
 
     flux = im
 
-    # N.B. read noise seems to be in ADU.
-    e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0)*gain + xwid*readnois*readnois*gain*gain) / gain
+    e_flux = numpy.sqrt(numpy.where(flux > 0, flux, 0) + xwid*readnois*readnois)
 
     blaze = None  # for now
 
