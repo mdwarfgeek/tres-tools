@@ -218,4 +218,4 @@ def chiron_orders(imode):
     return 59, [51, 52, 54, 55, 59, 66]
 
 def chiron_qvalues():
-  return [18917, 16752, 20230, 25058, 28237, 19470]
+  return [18931, 16763, 20241, 25076, 28207, 19355]
