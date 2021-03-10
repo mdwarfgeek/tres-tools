@@ -267,7 +267,6 @@ class read_spec:
     if nspec > 1:
       # Init lists, using the one we already have (reference).
       mbjdlist = numpy.empty([nspec])
-      zblist = numpy.empty([nspec])
       exptimelist = numpy.empty([nspec])
       wtlist = numpy.empty([nspec])
 
@@ -277,7 +276,6 @@ class read_spec:
       e_normedlist = [None] * nspec
 
       mbjdlist[0] = mbjd
-      zblist[0] = zb
       exptimelist[0] = exptime
 
       normord = self.singleorder-1
@@ -297,7 +295,6 @@ class read_spec:
         thismbjd, thiszb, thisexptime, thiswave, thisflux, thise_flux, thisblaze = self.read(filename, self.obs, src)
 
         mbjdlist[i+1] = thismbjd
-        zblist[i+1] = thiszb
         exptimelist[i+1] = thisexptime
 
         fluxout = numpy.empty_like(flux)
@@ -306,7 +303,7 @@ class read_spec:
         wtout = None
 
         for iord in range(nord):
-          interp_flux, interp_e_flux = finterp(wave[iord,:], thiswave[iord,:], thisflux[iord,:], thise_flux[iord,:])
+          interp_flux, interp_e_flux = finterp(wave[iord,:], thiswave[iord,:]*(1.0+thiszb)/(1.0+zb), thisflux[iord,:], thise_flux[iord,:])
 
           fluxout[iord,:] = interp_flux
           e_fluxout[iord,:] = interp_e_flux
@@ -362,7 +359,6 @@ class read_spec:
       wtlist /= numpy.sum(wtlist)
 
       mbjd = numpy.average(mbjdlist, weights=wtlist)
-      zb = numpy.average(zblist, weights=wtlist)
       exptime = numpy.sum(exptimelist)
 
     # Make mask.
