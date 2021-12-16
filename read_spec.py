@@ -398,6 +398,8 @@ class read_spec:
                 blaze=blaze,
                 vbcv=vbcv,
                 vrad=vrad,
+                objname=objname,
+                specname=specname,
                 exptime=exptime,
                 istmpl=istmpl)
 
