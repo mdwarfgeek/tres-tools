@@ -93,8 +93,8 @@ Installation
 ============
 
 The software was mostly for internal use so has unfortunately accrued
-a few unusual dependencies.  In addition to Python 2.7 with numpy,
-scipy and matplotlib the following modules are used:
+a few unusual dependencies.  In addition to Python with numpy, scipy
+and matplotlib the following modules are used:
 
 fitsio version 0.9.7 (others may work but are not recommended due to
 API changes), to install this use "pip install fitsio==0.9.7" or
@@ -114,11 +114,9 @@ my "sfit" module.
 
 For our use we have usually resorted to creating a virtual environment
 using "virtualenv" and installing everything inside it to avoid
-disturbing the setup of the system or the user's account, especially
-for Python 3 users.  I have tried to keep things compatible with
-Python 3 (most particularly the C modules which should have the
-necessary #ifdefs) but some of the scripts would need to be run
-through 2to3 mostly to deal with the changes to "print".
+disturbing the setup of the system or the user's account.  I have
+tried to keep things compatible with both Python 2.7 and 3 (most
+particularly the C modules, which should have the necessary #ifdefs).
 
 Other notes
 ===========
