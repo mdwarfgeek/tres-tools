@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import sys
 import math
 import numpy
@@ -12,10 +14,10 @@ argc = len(sys.argv)
 figsize = (10.5, 7.8)  # inches
 
 if argc < 3:
-  print "Usage:\t", sys.argv[0], "velfile [...] pmin pmax"
+  print("Usage:\t", sys.argv[0], "velfile [...] pmin pmax")
   sys.exit(1)
 
-(pmin, pmax) = map(float, sys.argv[argc-2:argc])
+(pmin, pmax) = list(map(float, sys.argv[argc-2:argc]))
 filelist = sys.argv[1:argc-2]
 
 buf = [None]*len(filelist)
@@ -94,7 +96,7 @@ else:
 
 vbest = (pl+p+offset)*vsamp
 
-print "Best period", 1.0/vbest, "days"
+print("Best period", 1.0/vbest, "days")
 
 (chinull, bnull, bcovnull) = sfit.null(buf)
 #print "Null hypothesis", chinull, bnull, bcovnull
@@ -136,9 +138,9 @@ for ilc, lc in enumerate(buf):
     bep = b[ndc:ndc+nep]  # external parameters
     bsc = b[ndc+nep:]     # sin, cos, sin, cos, ...
 
-    print "Dataset", ilc+1
+    print("Dataset", ilc+1)
 
-    print "gamma =", bdc[0], "km/s"
+    print("gamma =", bdc[0], "km/s")
 
     axf = plt.subplot(npanel, 1, 2*ilc+1)
 #    plt.axis([t[0], t[-1], numpy.max(ycorr), numpy.min(ycorr)])
@@ -157,7 +159,7 @@ for ilc, lc in enumerate(buf):
     ioff = round(numpy.mean(t) * vbest)
 
     # Final T_0 value.
-    print "T_0 =", bjdbase + (ioff+phic) / vbest
+    print("T_0 =", bjdbase + (ioff+phic) / vbest)
 
     plt.plot(modx, mody, color="red")
 
@@ -176,7 +178,7 @@ for ilc, lc in enumerate(buf):
 
     mody = bdc[0] + bsc[0] * numpy.sin(modp) + bsc[1] * numpy.cos(modp)
 
-    print "K1 =", math.sqrt(bsc[0]**2 + bsc[1]**2), "km/s"
+    print("K1 =", math.sqrt(bsc[0]**2 + bsc[1]**2), "km/s")
 
     plt.plot(modx, mody, color="red")
 

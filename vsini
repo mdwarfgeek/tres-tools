@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import math
 import os
@@ -207,12 +209,12 @@ for ifile, filename in enumerate(filelist):
 
   pdf.close()
 
-  print "{0:s} {1:12.4f} {2:5.2f} {3:5.2f} {4:7.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vsini, e_mean_vsini, sp.exptime),
+  print("{0:s} {1:12.4f} {2:5.2f} {3:5.2f} {4:7.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vsini, e_mean_vsini, sp.exptime), end=' ')
 
   for iord in range(len(multiorders)):
-    print " {0:2d} {1:5.2f} {2:8.6f}".format(multiorders[iord], l_vsini[iord], l_corr[iord]),
+    print(" {0:2d} {1:5.2f} {2:8.6f}".format(multiorders[iord], l_vsini[iord], l_corr[iord]), end=' ')
 
-  print
+  print()
 
 sys.exit(0)
 

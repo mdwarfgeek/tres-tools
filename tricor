@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import math
 import os
@@ -156,7 +158,7 @@ def do_optimize(filelist, targlist, optlist, init_parm):
 
       ssqh += hbest*hbest
 
-    print >>sys.stderr, "Trial:", trial_parm, "ssqh =", ssqh
+    print("Trial:", trial_parm, "ssqh =", ssqh, file=sys.stderr)
 
     return l_w
 
@@ -169,11 +171,11 @@ def do_optimize(filelist, targlist, optlist, init_parm):
   final_parm = numpy.copy(init_parm)
   final_parm[optlist] = vfit
 
-  print "L_2/L_1 = {0:.4f}".format(final_parm[PAR_ALPHA])
-  print "L_3/L_1 = {0:.4f}".format(final_parm[PAR_BETA])
-  print "vsinia  = {0:.4f}".format(final_parm[PAR_VSINIA])
-  print "vsinib  = {0:.4f}".format(final_parm[PAR_VSINIB])
-  print "vsinic  = {0:.4f}".format(final_parm[PAR_VSINIC])
+  print("L_2/L_1 = {0:.4f}".format(final_parm[PAR_ALPHA]))
+  print("L_3/L_1 = {0:.4f}".format(final_parm[PAR_BETA]))
+  print("vsinia  = {0:.4f}".format(final_parm[PAR_VSINIA]))
+  print("vsinib  = {0:.4f}".format(final_parm[PAR_VSINIB]))
+  print("vsinic  = {0:.4f}".format(final_parm[PAR_VSINIC]))
 
   return final_parm
 
@@ -210,11 +212,11 @@ def do_fixed(filelist, targlist, parm, dopdf=False):
       pdf.close()
 
     if not donehdr:
-      print "#BJD-TDB     vrad1    vrad2    vrad3    h         exptime"
+      print("#BJD-TDB     vrad1    vrad2    vrad3    h         exptime")
 
       donehdr = True
       
-    print "{0:12.4f} {1:8.3f} {2:8.3f} {3:8.3f} {4:9.6f} {5:7.2f}".format(lfa.ZMJD+sp.mbjd, xbest, ybest, zbest, hbest, sp.exptime)
+    print("{0:12.4f} {1:8.3f} {2:8.3f} {3:8.3f} {4:9.6f} {5:7.2f}".format(lfa.ZMJD+sp.mbjd, xbest, ybest, zbest, hbest, sp.exptime))
 
     ssqh += hbest*hbest
 
@@ -311,7 +313,7 @@ if args.a is not None:
 
 ssqh = do_fixed(filelist, targlist, parm, args.p)
 
-print >>sys.stderr, "Sum of h^2 =", ssqh
+print("Sum of h^2 =", ssqh, file=sys.stderr)
 
 sys.exit(0)
 

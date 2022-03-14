@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import math
 import sys
@@ -189,7 +191,7 @@ with open(args.pset, "r") as fp:
     # Now split into fields.
     ll = ls.split()
     if len(ll) < 3:
-      print >>sys.stderr, "could not understand:", line
+      print("could not understand:", line, file=sys.stderr)
       sys.exit(1)
 
     name = ll[0]
@@ -236,10 +238,10 @@ with open(args.pset, "r") as fp:
         elif vary == 2:
           fixed.append(True)
         else:
-          print >>sys.stderr, "unknown vary value:", vary
+          print("unknown vary value:", vary, file=sys.stderr)
           sys.exit(1)
     else:
-      print >>sys.stderr, "unknown parameter:", name
+      print("unknown parameter:", name, file=sys.stderr)
       sys.exit(1)
 
 # Convert these to numpy arrays.
@@ -249,7 +251,7 @@ fixed = numpy.array(fixed, dtype=numpy.bool)
 # Store this for later.
 if args.e:
   errguess = numpy.median(e_v1)
-  print "Using errguess =", errguess, "modified Jeffreys soften", 0.1*errguess
+  print("Using errguess =", errguess, "modified Jeffreys soften", 0.1*errguess)
 else:
   errguess = parm[PAR_S]
 
@@ -369,7 +371,7 @@ vfinal, verr, chisq, ndof = nlfit(fit_func, parm[plist], fixed, vfit, e_vfit)
 parm[plist] = vfinal
 
 # Fit parameters.
-print "L-M parameters:"
+print("L-M parameters:")
 
 for iparm in range(ndim):
   value = vfinal[iparm]
@@ -377,12 +379,12 @@ for iparm in range(ndim):
   if plist[iparm] == eb.PAR_T0:
     value += tbase
 
-  print "{0:<16} {1:14.6f} +/- {2:8.6f} {3}".format(plist_names[iparm],
+  print("{0:<16} {1:14.6f} +/- {2:8.6f} {3}".format(plist_names[iparm],
                                                     value,
                                                     verr[iparm],
-                                                    plist_units[iparm])
+                                                    plist_units[iparm]))
 
-print 'chi squared =', chisq, 'ndof =', ndof
+print('chi squared =', chisq, 'ndof =', ndof)
 
 if args.m is not None:
   # Init MC
@@ -445,8 +447,8 @@ if args.m is not None:
     if nburn < 1000:
       nburn = 1000
 
-  print "MCMC using", nwalk, "walkers nburn =", nburn, "nsim =", nsim
-  print "Will produce", nburn*nwalk, "burn-in and", nsim*nwalk, "final samples"
+  print("MCMC using", nwalk, "walkers nburn =", nburn, "nsim =", nsim)
+  print("Will produce", nburn*nwalk, "burn-in and", nsim*nwalk, "final samples")
 
   pos, prob, state = samp.run_mcmc(pos, nburn,
                                    rstate0=numpy.random.get_state())
@@ -459,10 +461,10 @@ if args.m is not None:
 
   plot_chain(samp, args.m + "_chains.png")
 
-  print "Acceptance fraction:", samp.acceptance_fraction
+  print("Acceptance fraction:", samp.acceptance_fraction)
 
   try:
-    print "Autocorrelation lengths:", samp.acor
+    print("Autocorrelation lengths:", samp.acor)
   except:
     pass
 
@@ -487,12 +489,12 @@ if args.m is not None:
   lfp = open(args.m + "_orbit.txt", "w")
   tfp = open(args.m + "_orbit.tex", "w")
 
-  print >>lfp, "MC parameters:"
-  print "MC parameters:"
+  print("MC parameters:", file=lfp)
+  print("MC parameters:")
 
-  print >>tfp, "\\hline"
-  print >>tfp, "MCMC parameters\\\\"
-  print >>tfp, "\\hline"
+  print("\\hline", file=tfp)
+  print("MCMC parameters\\\\", file=tfp)
+  print("\\hline", file=tfp)
 
   vmed = numpy.empty([ndim])
   vad = numpy.empty([ndim])
@@ -522,8 +524,8 @@ if args.m is not None:
                                                        err,
                                                        plist_units[iparm])
 
-    print >>lfp, line
-    print line
+    print(line, file=lfp)
+    print(line)
 
     # Special cases of n(dp) we want to be the same.
     if plist[iparm] == eb.PAR_ECOSW or plist[iparm] == eb.PAR_ESINW:
@@ -559,7 +561,7 @@ if args.m is not None:
                                                          fussyastronomer.format(med, ndp),
                                                          fussyastronomer.format(err, ndp))
 
-    print >>tfp, texline
+    print(texline, file=tfp)
 
   # Argument and phase of periastron need special treatment.
   parm[plist] = vmed
@@ -639,12 +641,12 @@ if args.m is not None:
               nsim=nsim,
               vder=vder)
 
-  print >>lfp, "Derived parameters:"
-  print "Derived parameters:"
+  print("Derived parameters:", file=lfp)
+  print("Derived parameters:")
 
-  print >>tfp, "\\hline"
-  print >>tfp, "Derived parameters\\\\"
-  print >>tfp, "\\hline"
+  print("\\hline", file=tfp)
+  print("Derived parameters\\\\", file=tfp)
+  print("\\hline", file=tfp)
 
   for ipar, name in enumerate(dernames):
     unit = derunits[ipar]
@@ -666,8 +668,8 @@ if args.m is not None:
       ul = numpy.percentile(vec, 95.0)
       line += " (95% CL < {0:.7f})".format(ul)
 
-    print >>lfp, line
-    print line
+    print(line, file=lfp)
+    print(line)
 
     ndp = fussyastronomer.ndp(err)
 
@@ -684,7 +686,7 @@ if args.m is not None:
                                                          fussyastronomer.format(med, ndp),
                                                          fussyastronomer.format(err, ndp))
 
-    print >>tfp, texline
+    print(texline, file=tfp)
 
   # Update parameters.
   parm[plist] = vmed
@@ -694,8 +696,8 @@ if args.m is not None:
   ndof = vfit.size - vmed.size
 
   if not args.e:
-    print >>lfp, "Median rms =", numpy.median(parm[PAR_S]/hh), "km/s"
-    print "Median rms =", numpy.median(parm[PAR_S]/hh), "km/s"
+    print("Median rms =", numpy.median(parm[PAR_S]/hh), "km/s", file=lfp)
+    print("Median rms =", numpy.median(parm[PAR_S]/hh), "km/s")
 
   lfp.close()
   tfp.close()
@@ -742,7 +744,7 @@ else:
   # Make vector.
   vder = numpy.array([ecc, argper, tperi, a1sini, f1, q, semmaj/eb.AU, m2, m2*eb.GMSUN/eb.GMJUP])
 
-  print "Derived parameters:"
+  print("Derived parameters:")
 
   for ipar, name in enumerate(dernames):
     unit = derunits[ipar]
@@ -754,7 +756,7 @@ else:
 
     line = "{0:<18} {1:13.7f} {2}".format(name, val, unit)
 
-    print line
+    print(line)
 
 # Phases of observations.
 tmp = (bjdfit - parm[eb.PAR_T0]) / parm[eb.PAR_P]
@@ -818,7 +820,7 @@ if args.double:
 
   resid2 = v2 - mod2
   if args.e:
-    print "Don't know how we got here"
+    print("Don't know how we got here")
     sys.exit(1)
   else:
     tmp = resid2 * hh
@@ -835,13 +837,13 @@ if args.double:
       if coef[2] < 0:
         sgn2 = "-"
 
-      print "gamma2 =", coef[0], "km/s", sgn1, abs(coef[1]), "km/s/day", sgn2, abs(coef[2]), "km/s/day/day"
+      print("gamma2 =", coef[0], "km/s", sgn1, abs(coef[1]), "km/s/day", sgn2, abs(coef[2]), "km/s/day/day")
     else:
-      print "gamma2 =", coef[0], "km/s", sgn1, abs(coef[1]), "km/s/day"
+      print("gamma2 =", coef[0], "km/s", sgn1, abs(coef[1]), "km/s/day")
   else:
-    print "gamma2 =", mean2, "km/s"
+    print("gamma2 =", mean2, "km/s")
 
-  print "sigma2 =", err2, "km/s"
+  print("sigma2 =", err2, "km/s")
 
   if args.u and drift > 0:
     dbjdmin = phimin * parm[eb.PAR_P]
@@ -876,11 +878,11 @@ fit_func(vfinal, ymod)
 
 resid = vfit-ymod
 
-print "RMS of residuals =", numpy.sqrt(numpy.sum(resid**2) / ndof)
+print("RMS of residuals =", numpy.sqrt(numpy.sum(resid**2) / ndof))
 
 chisq = numpy.sum((resid / e_vfit)**2)
 
-print "Final chi squared =", chisq, "ndof =", ndof
+print("Final chi squared =", chisq, "ndof =", ndof)
 
 plt.errorbar(phi, resid, yerr=e_vfit, fmt="o", color="blue")
 plt.axhline(0, color="blue")

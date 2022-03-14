@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import math
 import os
@@ -518,23 +520,23 @@ for ispec, sp in enumerate(speclist):
     if lt > lf:
       ss += " " * (lt-lf)
 
-    print ss,
+    print(ss, end=' ')
       
-    print "BJD-TDB      mean_vrad e_mean  exptime",
+    print("BJD-TDB      mean_vrad e_mean  exptime", end=' ')
     
     for iord in range(len(l_vrad)):
-      print " ap vrad      h       ",
+      print(" ap vrad      h       ", end=' ')
       
-    print
+    print()
 
     donehdr = True
   
-  print "{0:s} {1:12.4f} {2:9.4f} {3:7.4f} {4:7.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vrad, e_mean_vrad, sp.exptime),
+  print("{0:s} {1:12.4f} {2:9.4f} {3:7.4f} {4:7.2f}".format(filename, lfa.ZMJD+sp.mbjd, mean_vrad, e_mean_vrad, sp.exptime), end=' ')
 
   for iord in range(len(l_vrad)):
-    print " {0:2d} {1:9.4f} {2:8.6f}".format(multiorders[iord], l_vrad[iord], l_corr[iord]),
+    print(" {0:2d} {1:9.4f} {2:8.6f}".format(multiorders[iord], l_vrad[iord], l_corr[iord]), end=' ')
 
-  print
+  print()
 
 sys.exit(0)
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import numpy
 import sys
@@ -205,7 +207,7 @@ for filename in args.filelist:
 
     elif in_w:
       if event.key == "e":
-        print "Again"
+        print("Again")
         in_x = event.xdata
         in_y = event.ydata
 
@@ -268,7 +270,7 @@ for filename in args.filelist:
 
           plt.plot([ xtmp[imax], xtmp[imax] ], [ cont, cont+ytmp[imax] ], color="green")
 
-          print "center = {0:8.3f}, eqw = {1:8.4f}, continuum = {2:8.2f}, flux = {3:8.2f}".format(xcent, eqw, cont, ss)
+          print("center = {0:8.3f}, eqw = {1:8.4f}, continuum = {2:8.2f}, flux = {3:8.2f}".format(xcent, eqw, cont, ss))
           
         update()
 
@@ -340,7 +342,7 @@ for filename in args.filelist:
 
               update()
 
-              print "center = {0:8.3f}, flux = {1:8.2f}, eqw = {2:8.4f}, gfwhm = {3:8.4f}".format(xcent, flux, eqw, fwhm)
+              print("center = {0:8.3f}, flux = {1:8.2f}, eqw = {2:8.4f}, gfwhm = {3:8.4f}".format(xcent, flux, eqw, fwhm))
 
       in_k = False
 
@@ -373,7 +375,7 @@ for filename in args.filelist:
         wwp = usee_flux > 0
         theosnr = numpy.mean(useflux[wwp] / usee_flux[wwp])
 
-        print "mean = {0:.1f}, rms = {1:.1f}, snr = {2:.2f}, theo_snr={3:.2f}".format(mean, std, snr, theosnr)
+        print("mean = {0:.1f}, rms = {1:.1f}, snr = {2:.2f}, theo_snr={3:.2f}".format(mean, std, snr, theosnr))
 
       in_m = False
 
@@ -415,28 +417,28 @@ for filename in args.filelist:
         in_x = event.xdata
         in_y = event.ydata
 
-        print "Again"
+        print("Again")
         in_e = True
 
       elif event.key == "m":
         in_x = event.xdata
         in_y = event.ydata
 
-        print "Again"
+        print("Again")
         in_m = True
 
       elif event.key == "k":
         in_x = event.xdata
         in_y = event.ydata
 
-        print "Again"
+        print("Again")
         in_k = True
 
       elif event.key == "q":
         plt.close()
 
       elif event.key == "w":
-        print "Window"
+        print("Window")
         in_w = True
 
   drawmsk()

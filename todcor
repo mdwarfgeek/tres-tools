@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import math
 import os
@@ -261,7 +263,7 @@ def do_optimize(filelist, targlist, restrictlist, optlist, init_parm):
 
       ssqh += hbest*hbest
 
-    print >>sys.stderr, "Trial:", trial_parm, "ssqh =", ssqh
+    print("Trial:", trial_parm, "ssqh =", ssqh, file=sys.stderr)
 
     return l_w
 
@@ -274,9 +276,9 @@ def do_optimize(filelist, targlist, restrictlist, optlist, init_parm):
   final_parm = numpy.copy(init_parm)
   final_parm[optlist] = vfit
 
-  print "L_2/L_1 = {0:.4f}".format(final_parm[PAR_ALPHA])
-  print "vsinia  = {0:.4f}".format(final_parm[PAR_VSINIA])
-  print "vsinib  = {0:.4f}".format(final_parm[PAR_VSINIB])
+  print("L_2/L_1 = {0:.4f}".format(final_parm[PAR_ALPHA]))
+  print("vsinia  = {0:.4f}".format(final_parm[PAR_VSINIA]))
+  print("vsinib  = {0:.4f}".format(final_parm[PAR_VSINIB]))
 
   return final_parm
 
@@ -311,11 +313,11 @@ def do_fixed(filelist, targlist, restrictlist, parm, dopdf=False):
       pdf.close()
 
     if not donehdr:
-      print "#BJD-TDB     vrad1    vrad2    h         exptime"
+      print("#BJD-TDB     vrad1    vrad2    h         exptime")
 
       donehdr = True
       
-    print "{0:12.4f} {1:8.3f} {2:8.3f} {3:9.6f} {4:7.2f}".format(lfa.ZMJD+sp.mbjd, xbest, ybest, hbest, sp.exptime)
+    print("{0:12.4f} {1:8.3f} {2:8.3f} {3:9.6f} {4:7.2f}".format(lfa.ZMJD+sp.mbjd, xbest, ybest, hbest, sp.exptime))
 
     ssqh += hbest*hbest
 
@@ -399,7 +401,7 @@ if m:
   l_ssqh = numpy.empty_like(l_lrat)
   
   for ilrat, thislrat in enumerate(l_lrat):
-    print "L2/L1 =", thislrat
+    print("L2/L1 =", thislrat)
 
     trial_parm = numpy.copy(parm)
     trial_parm[PAR_ALPHA] = l_lrat[ilrat]
@@ -411,7 +413,7 @@ if m:
 
   best_lrat = -0.5*coef[1]/coef[2]
   
-  print >>sys.stderr, "Best L2/L1 =", best_lrat
+  print("Best L2/L1 =", best_lrat, file=sys.stderr)
   
   plt.plot(l_lrat, l_ssqh, '.')
   
@@ -424,7 +426,7 @@ if m:
   basefile = re.sub(r'_.*$', "", stripname(filelist[0]))
   outfile = basefile + "_todcor_lrat.pdf"
 
-  print "Writing plot to", outfile
+  print("Writing plot to", outfile)
 
   pdf = PdfPages(outfile)
   fig = plt.figure(figsize=figsize)
