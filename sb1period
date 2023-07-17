@@ -56,7 +56,7 @@ for ilc, lcfile in enumerate(filelist):
     window = t[-1]
 
   # DC offset = gamma velocity.
-  idc = numpy.zeros_like(t, dtype=numpy.int)
+  idc = numpy.zeros_like(t, dtype=int)
 
   # Add a tuple to the buffer.
   buf[ilc] = (t, y, wt,

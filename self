@@ -454,7 +454,7 @@ if nspec > 2 and not args.S:
       # deviations so I think it should still work okay.
       combmask = normedlist - mednormed < 5*numpy.hypot(e_normedlist, mederrnormed)
     else:
-      combmask = numpy.ones_like(fluxlist, dtype=numpy.bool)
+      combmask = numpy.ones_like(fluxlist, dtype=bool)
 
     # Weighted mean.  Unlike in read_spec we do not scale back to sum equiv.
     swt = numpy.sum(combmask, axis=0)

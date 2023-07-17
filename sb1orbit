@@ -245,8 +245,8 @@ with open(args.pset, "r") as fp:
       sys.exit(1)
 
 # Convert these to numpy arrays.
-plist = numpy.array(plist, dtype=numpy.int)
-fixed = numpy.array(fixed, dtype=numpy.bool)
+plist = numpy.array(plist, dtype=int)
+fixed = numpy.array(fixed, dtype=bool)
 
 # Store this for later.
 if args.e:
@@ -498,7 +498,7 @@ if args.m is not None:
 
   vmed = numpy.empty([ndim])
   vad = numpy.empty([ndim])
-  vndp = numpy.empty([ndim], dtype=numpy.int)
+  vndp = numpy.empty([ndim], dtype=int)
 
   ecc_kh_ndp = None
 

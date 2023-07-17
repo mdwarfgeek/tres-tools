@@ -124,7 +124,7 @@ class todcor:
 
   def vel2ind(self, vel):
     dll = numpy.log1p(vel * 1000 / lfa.LIGHT)
-    ill = numpy.rint(dll / self.lwsamp).astype(numpy.int)
+    ill = numpy.rint(dll / self.lwsamp).astype(int)
     ii = self.hbin + ill
 
     return ii

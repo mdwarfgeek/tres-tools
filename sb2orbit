@@ -245,8 +245,8 @@ for ll in pset_lines:
     sys.exit(1)
 
 # Convert these to numpy arrays.
-plist = numpy.array(plist, dtype=numpy.int)
-fixed = numpy.array(fixed, dtype=numpy.bool)
+plist = numpy.array(plist, dtype=int)
+fixed = numpy.array(fixed, dtype=bool)
 
 # Store this for later.
 errguess1 = parm[PAR_S1]
@@ -487,7 +487,7 @@ if args.m is not None:
 
   vmed = numpy.empty([ndim])
   vad = numpy.empty([ndim])
-  vndp = numpy.empty([ndim], dtype=numpy.int)
+  vndp = numpy.empty([ndim], dtype=int)
 
   ecc_kh_ndp = None
   sigma_ndp = None
@@ -616,7 +616,7 @@ if args.m is not None:
 
   vdermed = numpy.empty([nder])
   vderad = numpy.empty([nder])
-  vderndp = numpy.empty([nder], dtype=numpy.int)
+  vderndp = numpy.empty([nder], dtype=int)
 
   mass_ndp = None
 

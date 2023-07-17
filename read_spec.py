@@ -339,7 +339,7 @@ class read_spec:
         # deviations so I think it should still work okay.
         combmask = normedlist - mednormed < 5*numpy.hypot(e_normedlist, mederrnormed)
       else:
-        combmask = numpy.ones_like(fluxlist, dtype=numpy.bool)
+        combmask = numpy.ones_like(fluxlist, dtype=bool)
 
       # Weighted mean but scale back to equivalent of sum with no rejects.
       swt = numpy.sum(combmask, axis=0)
@@ -362,7 +362,7 @@ class read_spec:
       exptime = numpy.sum(exptimelist)
 
     # Make mask.
-    msk = numpy.ones_like(wave, dtype=numpy.bool)
+    msk = numpy.ones_like(wave, dtype=bool)
 
     # a band (O2)
     msk[numpy.logical_and(wave >= 6270, wave < 6330)] = 0
