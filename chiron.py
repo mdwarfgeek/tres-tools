@@ -1,10 +1,20 @@
-import fitsio
 import lfa
 import numpy
 import os
 import re
 import string
 import warnings
+
+# Import and set up astropy.io.fits or pyfits.  In order to read
+# IRAF-style wavelength solutions properly, it needs to be configured
+# not to strip header whitespace, which is done by setting the
+# variable pyfits.conf.strip_header_whitespace to False.
+try:
+  import astropy.io.fits as pyfits
+except ImportError:
+  import pyfits
+
+pyfits.conf.strip_header_whitespace = False
 
 from multispec import *
 
@@ -24,15 +34,15 @@ def chiron_obs():
   return obs
 
 def chiron_read(thefile, obs=None, src=None):
-  if isinstance(thefile, fitsio.FITS):
+  if isinstance(thefile, pyfits.HDUList):
     fp = thefile
   else:
-    fp = fitsio.FITS(thefile)
+    fp = pyfits.open(thefile)
 
   mp = fp[0]
 
   # Header.
-  hdr = mp.read_header()
+  hdr = mp.header
 
   # Time stamp: use shutter open time and exposure time.
   # Exposure meter is not reliable for faint targets so
@@ -137,7 +147,7 @@ def chiron_read(thefile, obs=None, src=None):
     xwid = None
 
   # Read spectrum, converting to double.
-  im = mp.read().astype(numpy.double)
+  im = mp.data.astype(numpy.double)
 
   if im.ndim == 3:  # chiron format
     nord, nwave, nvec = im.shape
@@ -192,10 +202,10 @@ def chiron_read(thefile, obs=None, src=None):
                           blbase)
 
     if os.path.exists(blfile):
-      blfp = fitsio.FITS(blfile)
+      blfp = pyfits.open(blfile)
       blmp = blfp[0]
       
-      blimg = blmp.read().astype(numpy.double)
+      blimg = blmp.data.astype(numpy.double)
 
       # Flat function used to normalize it is in the third plane of the
       # file, but both axes are reversed, so correct that.

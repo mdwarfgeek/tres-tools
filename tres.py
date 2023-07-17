@@ -1,4 +1,3 @@
-import fitsio
 import glob
 import lfa
 import numpy
@@ -6,6 +5,17 @@ import os
 import re
 import string
 import warnings
+
+# Import and set up astropy.io.fits or pyfits.  In order to read
+# IRAF-style wavelength solutions properly, it needs to be configured
+# not to strip header whitespace, which is done by setting the
+# variable pyfits.conf.strip_header_whitespace to False.
+try:
+  import astropy.io.fits as pyfits
+except ImportError:
+  import pyfits
+
+pyfits.conf.strip_header_whitespace = False
 
 import bary
 
@@ -60,15 +70,15 @@ def tres_find_blaze(utc):
   return None
 
 def tres_read(thefile, obs=None, src=None):
-  if isinstance(thefile, fitsio.FITS):
+  if isinstance(thefile, pyfits.HDUList):
     fp = thefile
   else:
-    fp = fitsio.FITS(thefile)
+    fp = pyfits.open(thefile)
 
   mp = fp[0]
 
   # Header.
-  hdr = mp.read_header()
+  hdr = mp.header
 
   # Time stamp information.
   dateobs = hdr["DATE-OBS"]
@@ -219,7 +229,7 @@ def tres_read(thefile, obs=None, src=None):
   xwid     = 4.5  # effective aperture size at faint end (read noise limited)
 
   # Read spectrum, converting to double.
-  flux = mp.read().astype(numpy.double)
+  flux = mp.data.astype(numpy.double)
 
   # Trim off extra dimensions (if extracted using IRAF).
   e_flux = None
@@ -242,10 +252,10 @@ def tres_read(thefile, obs=None, src=None):
 
   # Read blaze.
   if blfile is not None:
-    blfp = fitsio.FITS(blfile)
+    blfp = pyfits.open(blfile)
     blmp = blfp[0]
 
-    blaze = blmp.read().astype(numpy.double)
+    blaze = blmp.data.astype(numpy.double)
 
     # Trim off extra dimensions (if extracted using IRAF).
     if blaze.ndim > 2:

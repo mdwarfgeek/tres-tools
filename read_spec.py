@@ -3,7 +3,17 @@ import os
 import string
 import warnings
 
-import fitsio
+# Import and set up astropy.io.fits or pyfits.  In order to read
+# IRAF-style wavelength solutions properly, it needs to be configured
+# not to strip header whitespace, which is done by setting the
+# variable pyfits.conf.strip_header_whitespace to False.
+try:
+  import astropy.io.fits as pyfits
+except ImportError:
+  import pyfits
+
+pyfits.conf.strip_header_whitespace = False
+
 import lfa
 
 from finterp import *
@@ -170,10 +180,10 @@ class read_spec:
       src = getcoords(src_str)
 
     # Use first file for setup.
-    fp = fitsio.FITS(filelist[0], 'r')
+    fp = pyfits.open(filelist[0])
 
     mp = fp[0]
-    hdr = mp.read_header()
+    hdr = mp.header
     
     # Object name.
     if "OBJECT" in hdr:

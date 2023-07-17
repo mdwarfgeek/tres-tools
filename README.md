@@ -96,12 +96,13 @@ The software was mostly for internal use so has unfortunately accrued
 a few unusual dependencies.  In addition to Python with numpy, scipy
 and matplotlib the following modules are used:
 
-fitsio version 0.9.7 (others may work but are not recommended due to
-API changes), to install this use "pip install fitsio==0.9.7" or
-similar.  I'm considering changing this to use astropy.io.fits
-although if attempting to do so please note that it's more subtle than
-it first appears, whitespace must not be stripped from header values
-when reading the IRAF-style wavelength solutions in TRES files.
+Python >= 2.7
+
+numpy
+
+scipy
+
+astropy or pyfits
 
 My "lfa" module available in "lib" on this account.  Notes found there
 detail how to set up the ephemeris files for Barycentric corrections.

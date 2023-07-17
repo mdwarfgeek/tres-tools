@@ -1,8 +1,18 @@
-import fitsio
 import lfa
 import math
 import numpy
 import re
+
+# Import and set up astropy.io.fits or pyfits.  In order to read
+# IRAF-style wavelength solutions properly, it needs to be configured
+# not to strip header whitespace, which is done by setting the
+# variable pyfits.conf.strip_header_whitespace to False.
+try:
+  import astropy.io.fits as pyfits
+except ImportError:
+  import pyfits
+
+pyfits.conf.strip_header_whitespace = False
 
 from multispec import *
 
@@ -23,7 +33,14 @@ def harps_obs():
 
   return obs
 
-def harps_decode_packed_sexagesimal(thestr):
+def harps_decode_packed_sexagesimal(thecard):
+  # Extract the keyword value.
+  mm = re.match(r'^[^\=]+\=\s*([\+\-]?\d*\.?\d*)\s*/?.*$', thecard.image)
+  if mm is not None:
+    thestr = mm.groups()[0]
+  else:
+    thestr = str(thecard.value)
+
   # Deal with sign first to prevent "-0" problems.
   isneg = 0
 
@@ -78,16 +95,16 @@ def harps_read_bary(hdr, obs=None, src=None):
   # Replace Barycentric correction if observer structure is given.
   if obs is not None:
     if src is None:
-      # Decode the packed sexagesimal used for target coordinates in
-      # FITS header.  Requires dirty trick to force reading as a string,
-      # otherwise fitsio converts automatically to a float, which could
-      # corrupt it, given that the float conversion assumes the number
-      # is base-10 (it's not).
-      rastr = hdr._record_map["ESO TEL TARG ALPHA"]["value_orig"].strip()
-      destr = hdr._record_map["ESO TEL TARG DELTA"]["value_orig"].strip()
+      # Decode the broken packed sexagesimal format used for telescope
+      # target coordinates in ESO FITS headers.  This encoding looks
+      # like a base-10 float to pyfits, but it isn't and must be read
+      # as a string.  To do this we retrieve the raw card image and
+      # parse it ourselves.
+      racrd = hdr.cards["ESO TEL TARG ALPHA"]
+      decrd = hdr.cards["ESO TEL TARG DELTA"]
 
-      ra = harps_decode_packed_sexagesimal(rastr) * lfa.SEC_TO_RAD
-      de = harps_decode_packed_sexagesimal(destr) * lfa.AS_TO_RAD
+      ra = harps_decode_packed_sexagesimal(racrd) * lfa.SEC_TO_RAD
+      de = harps_decode_packed_sexagesimal(decrd) * lfa.AS_TO_RAD
 
       # Read other quantities (which are already in the right units).
       pma = float(hdr["ESO TEL TARG PMA"])
@@ -153,18 +170,18 @@ def harps_read_bary(hdr, obs=None, src=None):
 # Use file "e2ds_A.fits" (target, separate orders in original bins)
 
 def harps_read(thefile, obs=None, src=None):
-  if isinstance(thefile, fitsio.FITS):
+  if isinstance(thefile, pyfits.HDUList):
     fp = thefile
   else:
-    fp = fitsio.FITS(thefile)
+    fp = pyfits.open(thefile)
 
   mp = fp[0]
 
   # Header.
-  hdr = mp.read_header()
+  hdr = mp.header
 
   # Read spectrum, converting to double.
-  flux = mp.read().astype(numpy.double)
+  flux = mp.data.astype(numpy.double)
 
   nord, nwave = flux.shape
 
@@ -247,18 +264,18 @@ def harps_read(thefile, obs=None, src=None):
 # Use file "s1d_A.fits" (target, combined, rebinned)
 
 def harps_read_s1d(thefile, obs=None, src=None):
-  if isinstance(thefile, fitsio.FITS):
+  if isinstance(thefile, pyfits.HDUList):
     fp = thefile
   else:
-    fp = fitsio.FITS(thefile)
+    fp = pyfits.open(thefile)
 
   mp = fp[0]
 
   # Header.
-  hdr = mp.read_header()
+  hdr = mp.header
 
   # Read spectrum, converting to double.
-  flux = mp.read().astype(numpy.double)
+  flux = mp.data.astype(numpy.double)
 
   nwave, = flux.shape
   nord = 1

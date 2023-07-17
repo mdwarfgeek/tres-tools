@@ -6,8 +6,18 @@ import sys
 import re
 import math
 import numpy
-import fitsio
 import os
+
+# Import and set up astropy.io.fits or pyfits.  In order to read
+# IRAF-style wavelength solutions properly, it needs to be configured
+# not to strip header whitespace, which is done by setting the
+# variable pyfits.conf.strip_header_whitespace to False.
+try:
+  import astropy.io.fits as pyfits
+except ImportError:
+  import pyfits
+
+pyfits.conf.strip_header_whitespace = False
 
 from chiron import *
 from poly import *
@@ -16,47 +26,32 @@ if len(sys.argv) < 2:
   print("Usage:\t", sys.argv[0], "file [...]")
   sys.exit(1)
 
-nocopy = { "SIMPLE"  : 1,
-           "BITPIX"  : 1,
-           "NAXIS"   : 1,
-           "NAXIS1"  : 1,
-           "NAXIS2"  : 1,
-           "NAXIS3"  : 1,
-           "EXTEND"  : 1,
-           "COMMENT" : 1 }
-
 for infile in sys.argv[1:]:
-  fp = fitsio.FITS(infile, 'r')
+  fp = pyfits.open(infile)
 
   bjd, zb, exptime, wave, flux, e_flux, blaze = chiron_read(fp)
 
   mp = fp[0]
-  hdr = mp.read_header()
-
-  for keyword in nocopy:
-    hdr.delete(keyword)
+  hdr = mp.header.copy(strip=True)
 
   indir, inbase = os.path.split(infile)
 
   outfile = 'i' + re.sub(r'^a', '', inbase)
 
-  try:
-    os.unlink(outfile)
-  except:
-    pass
+  # The GAINS keyword is missing the closing quote, presumably because
+  # it was truncated incorrectly by IDL in the pipeline.  pyfits
+  # doesn't like this so we just remove it here.
+  del hdr["GAINS"]
 
-  ofp = fitsio.FITS(outfile, "rw")
-  ofp.write(flux, header=hdr)
-
-  ofp[0].write_key("CTYPE1", "MULTISPE")
-  ofp[0].write_key("CTYPE2", "MULTISPE")
-  ofp[0].write_key("CDELT1", 1.0)
-  ofp[0].write_key("CDELT2", 1.0)
-  ofp[0].write_key("CD1_1", 1.0)
-  ofp[0].write_key("CD2_2", 1.0)
-  ofp[0].write_key("WCSDIM", 2)
-  ofp[0].write_key("WAT0_001", "system=multispec")
-  ofp[0].write_key("WAT1_001", "wtype=multispec label=Wavelength units=angstroms")
+  hdr["CTYPE1"] = "MULTISPE"
+  hdr["CTYPE2"] = "MULTISPE"
+  hdr["CDELT1"] = 1.0
+  hdr["CDELT2"] = 1.0
+  hdr["CD1_1"] = 1.0
+  hdr["CD2_2"] = 1.0
+  hdr["WCSDIM"] = 2
+  hdr["WAT0_001"] = "system=multispec"
+  hdr["WAT1_001"] = "wtype=multispec label=Wavelength units=angstroms"
 
   nord, npix = wave.shape
 
@@ -119,5 +114,8 @@ for infile in sys.argv[1:]:
     key = "WAT2_{0:03d}".format(iwat2kw+1)
     val = wat2kw[iwat2kw*maxchars:(iwat2kw+1)*maxchars]
 
-    ofp[0].write_key(key, val)
+    hdr[key] = val
 
+  outhdus = [ pyfits.PrimaryHDU(flux, header=hdr) ]
+  ohl = pyfits.HDUList(outhdus)
+  ohl.writeto(outfile, clobber=True)
