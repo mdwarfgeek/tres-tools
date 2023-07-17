@@ -127,7 +127,7 @@ def chiron_read(thefile, obs=None, src=None):
     imode = int(hdr['MODE'])
     xwids = hdr['XWIDS']
 
-    if isinstance(xwids, basestring):
+    if isinstance(xwids, str):
       xwids = xwids.split(',')
 
     xwid = float(xwids[imode])
