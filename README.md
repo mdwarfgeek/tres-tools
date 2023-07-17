@@ -93,14 +93,15 @@ Installation
 ============
 
 The software was mostly for internal use so has unfortunately accrued
-a few unusual dependencies.  In addition to Python with numpy, scipy
-and matplotlib the following modules are used:
+a few unusual dependencies.
 
 Python >= 2.7
 
 numpy
 
 scipy
+
+matplotlib
 
 astropy or pyfits
 
