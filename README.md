@@ -93,7 +93,7 @@ Installation
 ============
 
 The software was mostly for internal use so has unfortunately accrued
-a few unusual dependencies.
+a few unusual dependencies:
 
 Python >= 2.7
 
