@@ -159,7 +159,7 @@ class read_spec:
         listfile = thisspec[1:]
         
         with open(listfile) as fp:
-          filelist.extend(list(map(string.strip, fp)))
+          filelist.extend([ s.strip() for s in fp ])
       else:
         filelist.append(thisspec)
 
