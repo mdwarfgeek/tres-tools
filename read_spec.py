@@ -217,6 +217,8 @@ class read_spec:
       val = hdr["INSTRUME"].strip()
       if val == "HARPS":
         specname = "harps"
+      elif val == "ESPRESSO":
+        specname = "espresso"
       elif val == "MIKE-Red":
         specname = "mike"
       elif val == "IGRINS":
